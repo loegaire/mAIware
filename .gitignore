@@ -1,0 +1,11 @@
+# Dependencies
+node_modules
+
+# Build artifacts and executables
+maiware-linux-x64
+maiware-win32-x64
+
+# Archives
+*.zip
+# Editor backup/swap files
+*~
