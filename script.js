@@ -213,144 +213,121 @@ let disassemblyInterval = null;
 let scrollInterval = null; // For auto-scrolling
 let currentLines = []; // For graph arrows
 
+// ---TRANG TEST NEW IPC LISTENERS (This replaces the demo logic) ---
 
-// --- FUNCTIONS ---
+// --- NEW IPC LISTENERS (This replaces the demo logic) ---
 
-function getNextResultState() {
-    const stateIndex = clickCount % 3;
-    if (stateIndex === 0) return 'safe';
-    if (stateIndex === 1) return 'suspicious';
-    return 'malware';
-}
+// 1. Listen for the 'scan-started' message from the backend
+window.electronAPI.onScanStarted((filename) => {
+  console.log(`UI: Received scan-started for ${filename}`);
+  
+  // 1. Set UI to "Analyzing" state
+  initialState.classList.remove('active'); //
+  analyzingState.classList.add('active'); //
+  analyzingFilename.textContent = filename; //
+  disassemblyFilenameEl.textContent = filename; //
 
-function startDemoScan() {
-    // 1. Determine upcoming result
-    const stateKey = getNextResultState();
-    const data = resultData[stateKey];
+  // 2. Update body class to show disassembly
+  bodyEl.classList.remove('is-showing-result'); //
+  bodyEl.classList.add('is-analyzing'); //
+  removeAnimationClasses(); //
+  
+  // 3. Populate disassembly with a "suspicious" default and start animation
+  // (We don't know the result yet, so we pick one)
+  populateDisassembly(mockDisassemblySuspicious); //
+  startDisassemblyAnimation(); //
+});
 
-    // 2. Set UI to "Analyzing" state
-    initialState.classList.remove('active');
-    analyzingState.classList.add('active');
-    analyzingFilename.textContent = demoFilename;
-    disassemblyFilenameEl.textContent = demoFilename;
+// 2. Listen for the 'scan-result' message from the backend
+window.electronAPI.onScanResult((scanResult) => {
+  console.log("UI: Received scan-result:", scanResult);
 
-    // 3. Update body class to show disassembly
-    bodyEl.classList.remove('is-showing-result');
-    bodyEl.classList.add('is-analyzing');
-    removeAnimationClasses(); // Clear old particle animations
-    
-    // 4. Hide stats, show disassembly (CSS handles this now)
-    // statsWrapper.style.display = 'none';
-    // disassemblyWrapper.style.display = 'flex';
+  // 1. Stop disassembly animation
+  clearInterval(disassemblyInterval); //
+  disassemblyInterval = null; //
 
+  // 2. Update body classes
+  bodyEl.classList.remove('is-analyzing'); //
+  bodyEl.classList.add('is-showing-result'); //
+  
+  // 3. Show "Result" state in scanner
+  analyzingState.classList.remove('active'); //
+  resultState.classList.add('active'); //
 
-    // 5. Populate disassembly and start animation
-    populateDisassembly(data.disassembly);
-    startDisassemblyAnimation();
+  // --- 4. MAP YOUR JSON DATA TO THE UI ---
 
-    // 6. Simulate a scan (wait for 3 seconds)
-    setTimeout(showDemoResult, 3000);
-}
+  // Determine result type
+  let resultType = 'safe';
+  let resultIconClass = 'fas fa-check-circle'; //
+  let resultMockGraph = mockGraphSafe; //
+  let resultMockDisassembly = mockDisassemblyBenign; //
+  let resultBodyClass = 'result-safe-active'; //
+  let resultScannerClass = 'result-safe'; //
+  let resultProgressClass = 'progress-bar-green'; //
+  let resultScoreClass = 'score-green'; //
+  let recommendation = 'You can safely run this file.'; //
 
-function showDemoResult() {
-    // 1. Stop disassembly animation
-    clearInterval(disassemblyInterval);
-    disassemblyInterval = null;
+  if (scanResult.classification.includes("Malware")) {
+    resultType = 'malware';
+    resultIconClass = 'fas fa-bug'; //
+    resultMockGraph = mockGraphMalware; //
+    resultMockDisassembly = mockDisassemblyMalware; //
+    resultBodyClass = 'result-malware-active'; //
+    resultScannerClass = 'result-malware'; //
+    resultProgressClass = 'progress-bar-red'; //
+    resultScoreClass = 'score-red'; //
+    recommendation = 'DO NOT OPEN. Quarantine this file immediately.'; //
+  } else if (scanResult.classification.includes("Suspicious")) {
+    resultType = 'suspicious';
+    resultIconClass = 'fas fa-exclamation-triangle'; //
+    resultMockGraph = mockGraphSuspicious; //
+    resultMockDisassembly = mockDisassemblySuspicious; //
+    resultBodyClass = 'result-suspicious-active'; //
+    resultScannerClass = 'result-suspicious'; //
+    resultProgressClass = 'progress-bar-yellow'; //
+    resultScoreClass = 'score-yellow'; //
+    recommendation = 'Be cautious. Only run if you trust the source.'; //
+  }
+  
+  // Create the animation wrapper (from your original script)
+  if (!animationWrapper) {
+      animationWrapper = document.createElement('div');
+      animationWrapper.className = 'animation-swarm';
+      for (let i = 0; i < 10; i++) {
+          const particle = document.createElement('span');
+          animationWrapper.appendChild(particle);
+      }
+      bodyEl.prepend(animationWrapper);
+  }
+  bodyEl.classList.add(resultBodyClass); //
 
-    // 2. Update body classes
-    bodyEl.classList.remove('is-analyzing');
-    bodyEl.classList.add('is-showing-result');
-    
-    // 3. Show "Result" state in scanner
-    analyzingState.classList.remove('active');
-    resultState.classList.add('active');
+  // 5. Populate Scanner Panel
+  resultState.className = `scanner-state active ${resultScannerClass}`; //
+  resultIcon.className = `result-icon ${resultIconClass}`; //
+  resultText.textContent = scanResult.classification; //
+  resultDetails.textContent = `Scanned ${scanResult.scanned_sample_name} via ${scanResult.vendor}`; //
+  resultFilename.textContent = scanResult.detected_filename; //
 
-    // 4. Determine which result to show
-    const stateKey = getNextResultState();
-    const data = resultData[stateKey];
+  // 6. Populate NEW Analysis Details Panel
+  progressBarFill.className = 'progress-bar-fill'; //
+  scorePercentage.className = 'score-percentage'; //
+  
+  progressBarFill.classList.add(resultProgressClass); //
+  progressBarFill.style.width = `${scanResult.confidence_score * 100}%`; //
+  
+  scorePercentage.textContent = `${(scanResult.confidence_score * 100).toFixed(0)}%`; //
+  scorePercentage.classList.add(resultScoreClass); //
 
-    // Create the animation wrapper if it doesn't exist
-    if (!animationWrapper) {
-        animationWrapper = document.createElement('div');
-        animationWrapper.className = 'animation-swarm';
-        
-        // NEW: Create 10 span particles for the new animation
-        for (let i = 0; i < 10; i++) {
-            const particle = document.createElement('span');
-            animationWrapper.appendChild(particle);
-        }
-        
-        bodyEl.prepend(animationWrapper);
-    }
-    
-    // 5. Populate Scanner Panel
-    resultState.className = `scanner-state active ${data.resultClass}`;
-    resultIcon.className = `result-icon ${data.icon}`;
-    resultText.textContent = data.title;
-    resultDetails.textContent = 'See analysis details below.'; // Updated
-    resultFilename.textContent = demoFilename;
-    bodyEl.classList.add(data.bodyClass);
+  // --- This is the key mapping ---
+  detailsReasoning.textContent = `Filetype: ${scanResult.key_findings.file_type}. Packer: ${scanResult.key_findings.packer_detected}.`; //
+  detailsHash.textContent = scanResult.file_hashes.sha256; //
+  detailsRecommendation.textContent = recommendation;
 
-    // 6. Populate NEW Analysis Details Panel
-    // Clear old classes
-    progressBarFill.className = 'progress-bar-fill';
-    scorePercentage.className = 'score-percentage';
-    
-    // Set progress bar
-    progressBarFill.classList.add(data.progressClass);
-    progressBarFill.style.width = `${data.score}%`;
-    
-    // Set score text
-    scorePercentage.textContent = `${data.score}%`;
-    scorePercentage.classList.add(data.scoreClass);
-
-    // Set text fields
-    detailsReasoning.textContent = data.reason;
-    detailsHash.textContent = data.hash;
-    detailsRecommendation.textContent = data.recommendation;
-
-    // 7. NEW: Populate Graph Panel
-    drawCallGraph(data.graph);
-
-    // 8. Increment click counter
-    clickCount++;
-}
-
-function resetDemo() {
-    // 1. Go back to the initial state
-    resultState.classList.remove('active');
-    initialState.classList.add('active');
-    
-    // 2. Clear result classes
-    resultState.className = 'scanner-state'; 
-    
-    // 3. Stop animations and hide panels
-    clearInterval(disassemblyInterval);
-    disassemblyInterval = null;
-    removeAnimationClasses();
-    bodyEl.classList.remove('is-analyzing', 'is-showing-result');
-    
-    // 4. Show stats, hide disassembly (CSS handles this)
-    // statsWrapper.style.display = 'flex';
-    // disassemblyWrapper.style.display = 'none';
-
-    // 5. Clear disassembly text
-    disassemblyCodeEl.innerHTML = '';
-
-    // 6. Clear and reset analysis details
-    progressBarFill.style.width = '0%';
-    scorePercentage.textContent = '0%';
-    detailsReasoning.textContent = '...';
-    detailsHash.textContent = '...';
-    detailsRecommendation.textContent = '...';
-    progressBarFill.className = 'progress-bar-fill';
-    scorePercentage.className = 'score-percentage';
-
-    // 7. NEW: Clear graph
-    currentLines.forEach(line => line.remove());
-    currentLines = [];
-    callGraphEl.innerHTML = '';
-}
+  // 7. Populate Disassembly & Graph
+  // (We use the mock data based on classification for the demo)
+  populateDisassembly(resultMockDisassembly); //
+  drawCallGraph(resultMockGraph); //
+});
 
 function removeAnimationClasses() {
     bodyEl.classList.remove('result-safe-active');
@@ -607,7 +584,3 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-// --- REMOVED THE EXTRA '}' ---
-
-
-
