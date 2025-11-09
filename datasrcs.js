@@ -1,17 +1,42 @@
 // This file acts as our "database" of mappings, just as you requested.
 
 // 1. VENDORS (20 samples)
+// (This was already perfect, no changes needed)
 const VENDORS = [
-  'Google', 'VirusTotal', 'Microsoft', 'CrowdStrike', 'SentinelOne', 
-  'Palo Alto Networks', 'McAfee', 'Symantec (Broadcom)', 'Kaspersky', 'ESET',
-  'Malwarebytes', 'Sophos', 'Trend Micro', 'FireEye (Trellix)', 'Zscaler',
-  'Cisco Talos', 'Avast', 'Bitdefender', 'Fortinet', 'Check Point'
+  { name: 'Google', icon: 'fab fa-google' }, // 0
+  { name: 'VirusTotal', icon: 'fas fa-shield-virus' }, // 1
+  { name: 'Microsoft', icon: 'fab fa-windows' }, // 2
+  { name: 'CrowdStrike', icon: 'fas fa-crow' }, // 3
+  { name: 'SentinelOne', icon: 'fas fa-satellite-dish' }, // 4
+  { name: 'Palo Alto Networks', icon: 'fas fa-fire-wall' }, // 5
+  { name: 'McAfee', icon: 'fas fa-shield-alt' }, // 6
+  { name: 'Symantec (Broadcom)', icon: 'fas fa-shield-alt' }, // 7
+  { name: 'Kaspersky', icon: 'fas fa-shield-alt' }, // 8
+  { name: 'ESET', icon: 'fas fa-shield-alt' }, // 9
+  { name: 'Malwarebytes', icon: 'fas fa-shield-alt' }, // 10
+  { name: 'Sophos', icon: 'fas fa-shield-alt' }, // 11
+  { name: 'Trend Micro', icon: 'fas fa-shield-alt' }, // 12
+  { name: 'FireEye (Trellix)', icon: 'fas fa-fire' }, // 13
+  { name: 'Zscaler', icon: 'fas fa-cloud' }, // 14
+  { name: 'Cisco Talos', icon: 'fas fa-shield-alt' }, // 15
+  { name: 'Avast', icon: 'fas fa-shield-alt' }, // 16
+  { name: 'Bitdefender', icon: 'fas fa-shield-alt' }, // 17
+  { name: 'Fortinet', icon: 'fas fa-fort-awesome' }, // 18
+  { name: 'Check Point', icon: 'fas fa-shield-alt' } // 19
 ];
 
-// 2. DIGITAL SIGNATURES
+// 2. DIGITAL SIGNATURES (MODIFIED)
+// I've converted this from a simple string array to an object array
+// to include UI data (icon and level for color-coding).
 const SIGNATURES = [
-  'Verified (Microsoft Corporation)', 'Verified (Google LLC)', 'Verified (Notepad++ team)',
-  'Verified (Unknown Publisher)', 'Not Signed', 'Expired Certificate', 'Self-Signed (Untrusted)'
+  // name, icon, level
+  { name: 'Verified (Microsoft Corporation)', icon: 'fas fa-check-shield', level: 'verified' }, // 0
+  { name: 'Verified (Google LLC)', icon: 'fas fa-check-shield', level: 'verified' }, // 1
+  { name: 'Verified (Notepad++ team)', icon: 'fas fa-check-shield', level: 'verified' }, // 2
+  { name: 'Verified (Unknown Publisher)', icon: 'fas fa-exclamation-triangle', level: 'unknown' }, // 3
+  { name: 'Not Signed', icon: 'fas fa-times-circle', level: 'untrusted' }, // 4
+  { name: 'Expired Certificate', icon: 'fas fa-exclamation-triangle', level: 'untrusted' }, // 5
+  { name: 'Self-Signed (Untrusted)', icon: 'fas fa-times-circle', level: 'untrusted' } // 6
 ];
 
 // 3. FILE TYPES
@@ -55,6 +80,18 @@ const BENIGN_STRINGS = [
   'Calculator', 'CreateFileW', 'WriteFile', 'ReadFile', 'Windows Sockets 2.0 32-bit'
 ];
 
+// 9. CLASSIFICATION
+const CLASSIFICATION = [
+  'Benign',       // Index 0
+  'Suspicious',   // Index 1
+  'Malware'       // Index 2
+];
+
+// 10. NEW: ENTROPY SECTIONS
+const ENTROPY_SECTIONS = [
+  '.text', '.data', '.rsrc', 'UPX0', 'UPX1', '.reloc'
+];
+
 // Export all lists to be used by the sample generator
 module.exports = {
   VENDORS,
@@ -64,5 +101,7 @@ module.exports = {
   MALWARE_FAMILIES,
   SUSPICIOUS_APIS,
   SUSPICIOUS_STRINGS,
-  BENIGN_STRINGS
+  BENIGN_STRINGS,
+  CLASSIFICATION,
+  ENTROPY_SECTIONS
 };
