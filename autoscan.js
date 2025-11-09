@@ -1,10 +1,10 @@
-const { app } = require('electron') //
-const chokidar = require('chokidar') //
-const path = require('node:path') //
-const fs = require('node:fs') //
-const fsPromises = require('node:fs').promises //
-const axios = require('axios') //
-const FormData = require('form-data') //
+const { app } = require('electron')
+const chokidar = require('chokidar')
+const path = require('node:path')
+const fs = require('node:fs')
+const fsPromises = require('node:fs').promises
+const axios = require('axios')
+const FormData = require('form-data')
 const { getRandomDemoJson } = require('./jsonsamples') //
 
 // --- Configuration ---
@@ -16,8 +16,7 @@ let isProcessing = false //
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms)) //
 
-// --- ACCEPT THE 'win' OBJECT ---
-async function processQueue(win) { 
+async function processQueue(win) {
   if (isProcessing || fileQueue.length === 0) { //
     return
   }
@@ -26,31 +25,25 @@ async function processQueue(win) {
   const filePath = fileQueue.shift() //
   const detectedFilename = path.basename(filePath) //
 
-  // (We already sent 'scan-started' in the watcher)
   console.log(`[Monitor] Processing: ${detectedFilename}`) //
 
   try {
     const stats = await fsPromises.stat(filePath) //
 
     if (stats.size < FILE_SIZE_THRESHOLD) { //
-      // --- PASS 'win' DOWN ---
       await handleSmallFile(win, filePath, detectedFilename) //
     } else {
       console.log(`[Monitor] File ${detectedFilename} is large, skipping server push.`) //
-      // (Optional: Send a "skipped" message to UI)
-      // win.webContents.send('scan-skipped', detectedFilename) 
     }
 
-  } catch (err) {
+  } catch (err) { //
     console.error(`[Monitor] Error processing ${filePath}:`, err.message) //
   } finally {
     isProcessing = false //
-    // --- PASS 'win' RECURSIVELY ---
     processQueue(win) //
   }
 }
 
-// --- ACCEPT THE 'win' OBJECT ---
 async function handleSmallFile(win, filePath, detectedFilename) {
   // 1. "Real Upload" task
   const uploadTask = async () => { //
@@ -68,7 +61,7 @@ async function handleSmallFile(win, filePath, detectedFilename) {
     }
   }
 
-  // 2. "Demo Printout" task
+  // 2. "Printout" 
   const demoTask = async () => { //
     console.log(`[Scan] Scanning for ${detectedFilename}...`) //
     await delay(10000) //
@@ -77,15 +70,11 @@ async function handleSmallFile(win, filePath, detectedFilename) {
     
     console.log(`[Scan] Scan completed. (Triggered by ${detectedFilename})`) //
 
-    // (Print to terminal for debugging)
     console.log("--- SCAN RESULT ---") //
     console.log(JSON.stringify(scanResult, null, 2)) //
     console.log("-------------------------------") //
     
-    // --- THIS IS THE KEY ---
-    // Send the final JSON object to the UI
     win.webContents.send('scan-result', scanResult)
-    // -----------------------
   }
 
   // 3. Run both in parallel
@@ -95,7 +84,6 @@ async function handleSmallFile(win, filePath, detectedFilename) {
   ])
 }
 
-// --- ACCEPT THE 'win' OBJECT ---
 function startFileMonitor(win) {
   const downloadPath = app.getPath('downloads') //
   console.log(`[Monitor] Watching for new files in: ${downloadPath}`) //
@@ -115,16 +103,14 @@ function startFileMonitor(win) {
     const detectedFilename = path.basename(filePath)
     console.log(`[Monitor] Detected new file: ${detectedFilename}`) //
     
-    // --- THIS IS THE KEY ---
     // Send the "started" message to the UI immediately
     win.webContents.send('scan-started', detectedFilename)
-    // -----------------------
     
     fileQueue.push(filePath) //
-    // --- PASS 'win' TO THE QUEUE ---
     processQueue(win) //
   })
-}
+  // ----------------------------------------------
+} 
 
 module.exports = {
   startFileMonitor //

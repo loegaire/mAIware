@@ -1,110 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mAIware AI Malware Detection Demo</title>
-
+    <!-- Font Awesome for icons (which you already had) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
+    <!-- Chart.js for stats (which you already had) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    
+    <!-- Link to the CSS file -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body> <!-- Removed 'main-grid' class -->
 
+<body>
     <nav class="top-nav">
-        <div class="logo">
-            <i class="fas fa-shield-virus"></i>
-            <span>mAIware</span>
-        </div>
-        <div class="nav-links">
-            <a href="#" class="nav-link" data-tooltip="Login">
-                <i class="fas fa-sign-in-alt"></i>
-                <span class="link-text">Login</span>
-            </a>
-            <a href="#" class="nav-link" data-tooltip="Sign Up">
-                <i class="fas fa-user-plus"></i>
-                <span class="link-text">Sign Up</span>
-            </a>
-            <a href="#" class="nav-link" data-tooltip="Community">
-                <i class="fas fa-users"></i>
-                <span class="link-text">Community</span>
-            </a>
-            <a href="#" class="nav-link" data-tooltip="API Docs">
-                <i class="fas fa-code"></i>
-                <span class="link-text">API</span>
-            </a>
-            <a href="#" id="history-btn" class="nav-link" data-tooltip="Scan History">
-                <i class="fas fa-history"></i>
-                <span class="link-text">History</span>
-            </a>
-        </div>
+        <div class="logo"> <i class="fas fa-shield-virus"></i> <span>mAIware</span> </div>
+        <div class="nav-links"> <a href="#" class="nav-link" data-tooltip="Login"><i class="fas fa-sign-in-alt"></i><span class="link-text">Login</span></a> <a href="#" class="nav-link" data-tooltip="Sign Up"><i class="fas fa-user-plus"></i><span class="link-text">Sign Up</span></a> <a href="#" class="nav-link" data-tooltip="Community"><i class="fas fa-users"></i><span class="link-text">Community</span></a> <a href="#" class="nav-link" data-tooltip="API Docs"><i class="fas fa-code"></i><span class="link-text">API</span></a> <a href="#" id="history-btn" class="nav-link" data-tooltip="Scan History"><i class="fas fa-history"></i><span class="link-text">History</span></a> </div>
     </nav>
 
-    <!-- NEW: Main container for grid layout -->
     <main class="main-container">
-        <!-- Scanner Column -->
+        <!-- Column 1 -->
         <div class="scanner-wrapper">
-            
             <!-- Main Scanner Box -->
             <div class="scanner-container">
                 <h1>AI Malware Detection</h1>
-                
-                <!-- State 1: Upload -->
-                <!-- <div id="initial-state" class="scanner-state active">
-                    <p>Upload a file to scan for threats.</p>
-                    <div id="drop-zone" class="upload-zone" onclick="startDemoScan()">
-                        <i class="upload-icon fas fa-file-upload"></i>
-                        <h3>Click to Upload File</h3>
-                        <span>(This will start a demo)</span>
-                    </div>
-                </div> -->
-
-                <!--TRANG TEST-->
-
-                <div id="initial-state" class="scanner-state active"> <p>Watching your Downloads folder for new files...</p>
-                    <div id="drop-zone" class="upload-zone" > <i class="upload-icon fas fa-eye"></i> <h3>Automatic Scanning Active</h3>
+                <!-- State 1: Initial -->
+                <div id="initial-state" class="scanner-state active">
+                    <p>Watching your Downloads folder for new files...</p>
+                    <div id="drop-zone" class="upload-zone"> <i class="upload-icon fas fa-eye"></i>
+                        <h3>Automatic Scanning Active</h3>
                         <span>(Download a file to begin)</span>
                     </div>
                 </div>
-
-                <!--TRANG TEST-->
 
                 <!-- State 2: Analyzing -->
                 <div id="analyzing-state" class="scanner-state">
                     <div class="analyzing-icon">
                         <div class="loader"></div>
                     </div>
-                    <h3>Analyzing...</h3>
-                    <span class="filename" id="analyzing-filename">demo_file.exe</span>
-                </div>
+                    <h3>Analyzing...</h3> <span class="filename" id="analyzing-filename">demo_file.exe</span> </div>
 
                 <!-- State 3: Result -->
-                <div id="result-state" class="scanner-state">
-                    <i class="result-icon" id="result-icon"></i>
+                <div id="result-state" class="scanner-state"> <i class="result-icon" id="result-icon"></i>
                     <h2 id="result-text"></h2>
                     <div class="filename" id="result-filename"></div>
-                    <p id="result-details"></p>
-                    <button class="btn btn-secondary" onclick="resetDemo()">Scan Another File</button>
+                    <p id="result-details"></p> 
+                    <!-- Removed the resetDemo() button as it's automatic now -->
                 </div>
             </div>
 
-            <!-- Analysis Details Panel (shows on result) -->
+            <!-- Analysis Details (Shows on result) -->
             <div class="analysis-details-container" id="analysis-details-wrapper">
                 <div class="progress-header">
-                    <h3>Malware Confidence</h3>
-                    <span class="score-percentage" id="score-percentage">0%</span>
-                </div>
+                    <h3>Malware Confidence</h3> <span class="score-percentage" id="score-percentage">0%</span> </div>
                 <div class="progress-bar-background">
                     <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;"></div>
                 </div>
 
-                <div class="details-section">
-                    <h4>Key Finding</h4>
-                    <p id="details-reasoning">...</p>
+                <!-- This grid holds Vendor and Signature -->
+                <div class="details-grid">
+                    <!-- Vendor UI Container -->
+                    <div class="details-section" id="details-vendor">
+                        <h4>Vendor Analysis</h4>
+                        <div class="vendor-info">
+                            <i class="fas fa-question-circle"></i>
+                            <span>Scanning...</span>
+                        </div>
+                    </div>
+                    <!-- Signature UI Container -->
+                    <div class="details-section" id="details-signature">
+                        <h4>Digital Signature</h4>
+                        <div class="signature-info">
+                            <i class="fas fa-question-circle"></i>
+                            <span>Checking...</span>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- Reasoning (File Type/Packer) -->
+                <div class="details-section">
+                    <h4>Key Findings</h4>
+                    <p id="details-reasoning">...</p>
+                </div>
+                
                 <div class="details-section">
                     <h4>SHA256 Hash</h4>
                     <p class="hash-text" id="details-hash">...</p>
@@ -114,74 +93,68 @@
                     <h4>What To Do Next</h4>
                     <p id="details-recommendation">...</p>
                 </div>
-                
-                <div class="btn-wrapper">
-                    <button class="btn btn-primary"><i class="fas fa-download"></i> Download Report</button>
-                    <button class="btn btn-secondary"><i class="fas fa-flag"></i> Report False Positive</button>
-                </div>
+
+                <div class="btn-wrapper"> <button class="btn btn-primary"><i class="fas fa-download"></i> Download Report</button> <button class="btn btn-secondary"><i class="fas fa-flag"></i> Report False Positive</button> </div>
             </div>
         </div>
 
-        <!-- Right Column (Stats / Disassembly) -->
+        <!-- Column 2 -->
         <div class="right-panel-wrapper">
-
-            <!-- Stats Dashboard (shows by default) -->
+            <!-- Stats (Shows on initial) -->
             <div class="stats-wrapper" id="stats-wrapper">
-                
-                <!-- Stat Cards -->
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <i class="fas fa-virus-slash"></i>
-                        <div class="stat-content">
-                            <span class="stat-number" data-target="14720938">0</span>
-                            <span class="stat-label">Malware Analyzed</span>
-                        </div>
+                    <div class="stat-card"> <i class="fas fa-virus-slash"></i>
+                        <div class="stat-content"> <span class="stat-number" data-target="14720938">0</span> <span class="stat-label">Malware Analyzed</span> </div>
                     </div>
-                    <div class="stat-card">
-                        <i class="fas fa-users"></i>
-                        <div class="stat-content">
-                            <span class="stat-number" data-target="82041">0</span>
-                            <span class="stat-label">Active Users</span> <!-- Corrected typo -->
-                        </div>
+                    <div class="stat-card"> <i class="fas fa-users"></i>
+                        <div class="stat-content"> <span class="stat-number" data-target="82041">0</span> <span class="stat-label">Active Users</span> </div>
                     </div>
-                    <div class="stat-card">
-                        <i class="fas fa-chart-line"></i>
-                        <div class="stat-content">
-                            <span class="stat-number" data-target="1259024">0</span>
-                            <span class="stat-label">Site Visits (24h)</span>
-                        </div>
+                    <div class="stat-card"> <i class="fas fa-chart-line"></i>
+                        <div class="stat-content"> <span class="stat-number" data-target="1259024">0</span> <span class="stat-label">Site Visits (24h)</span> </div>
                     </div>
                 </div>
-
-                <!-- Charts -->
                 <div class="chart-container-wrapper">
                     <div class="chart-container">
-                        <h3>Top 5 Malware Families (30 Days)</h3>
-                        <canvas id="topMalwareChart"></canvas>
-                    </div>
+                        <h3>Top 5 Malware Families (30 Days)</h3> <canvas id="topMalwareChart"></canvas> </div>
                     <div class="chart-container">
-                        <h3>Submission Types</h3>
-                        <canvas id="malwareTypesChart"></canvas>
-                    </div>
+                        <h3>Submission Types</h3> <canvas id="malwareTypesChart"></canvas> </div>
                 </div>
             </div>
 
-            <!-- Disassembly Panel (shows on analysis) -->
+            <!-- Disassembly (Shows on analyzing/result) -->
             <div class="disassembly-wrapper" id="disassembly-wrapper">
                 <div class="disassembly-header">
                     <h3>Disassembly: <span id="disassembly-filename"></span></h3>
                 </div>
-                <div class="disassembly-code" id="disassembly-code">
-                    <!-- JS will populate this -->
-                </div>
+                <div class="disassembly-code" id="disassembly-code"> </div>
             </div>
 
+            <!-- File Internals (Shows on result) -->
+            <div class="file-internals-container" id="file-internals-wrapper">
+                <h3>File Internals</h3>
+                
+                <!-- Entropy UI Container -->
+                <div class="details-section">
+                    <h4>Section Entropy (0=Normal, 8=Packed/Encrypted)</h4>
+                    <div class="entropy-bars" id="entropy-bars-container">
+                        <!-- JS will populate this -->
+                    </div>
+                </div>
+                
+                <!-- Key Strings UI Container -->
+                <div class="details-section">
+                    <h4>Suspicious / Key Strings</h4>
+                    <div class="key-strings" id="key-strings-container">
+                        <!-- JS will populate this -->
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Graph Panel (shows on result) -->
+        <!-- Full Width Row -->
         <div class="graph-wrapper" id="graph-wrapper">
             <div class="graph-header">
-                <h3>Function Call Graph</h3>
+                <h3>Dynamic Function Call Graph (Simulation)</h3>
             </div>
             <div class="call-graph-container">
                 <div class="call-graph" id="call-graph">
@@ -189,60 +162,25 @@
                 </div>
             </div>
         </div>
-    </main> <!-- END of main-container -->
-    
-    <!-- History Panel & Overlay -->
+    </main>
+
+    <!-- History Panel (Hidden by default) -->
     <div class="history-overlay" id="history-overlay"></div>
     <div class="history-panel" id="history-panel">
         <div class="history-header">
-            <h3>Scan History</h3>
-            <button class="history-close-btn" id="history-close-btn"><i class="fas fa-times"></i></button>
-        </div>
+            <h3>Scan History</h3> <button class="history-close-btn" id="history-close-btn"><i class="fas fa-times"></i></button> </div>
         <ul class="history-list">
-            <li>
-                <div class="history-icon icon-malware"><i class="fas fa-bug"></i></div>
-                <div class="history-details">
-                    <span class="history-file">WannaCry.exe</span>
-                    <span class="history-hash">b4a5b6c7d...f4a5</span>
-                </div>
-                <div class="history-meta">
-                    <span class="history-verdict">Malware</span>
-                    <span class="history-date">Oct 22, 2025</span>
-                </div>
-            </li>
-            <li>
-                <div class="history-icon icon-suspicious"><i class="fas fa-exclamation-triangle"></i></div>
-                <div class="history-details">
-                    <span class="history-file">patch_v2.exe</span>
-                    <span class="history-hash">f1e2d3c4b...f1e2</span>
-                </div>
-                <div class="history-meta">
-                    <span class="history-verdict">Suspicious</span>
-                    <span class="history-date">Oct 21, 2025</span> <!-- Corrected typo -->
-                </div>
-            </li>
-            <li>
-                <div class="history-icon icon-safe"><i class="fas fa-check-circle"></i></div>
-                <div class="history-details">
-                    <span class="history-file">hello_world.exe</span>
-                    <span class="history-hash">a1b2c3d4e...a1b2</span>
-                </div>
-                <div class="history-meta">
-                    <span class="history-verdict">Safe</span>
-                    <span class="history-date">Oct 20, 2025</span>
-                </div>
-            </li>
+            <!-- JS would populate this -->
         </ul>
     </div>
 
     <!-- Scroll Zones -->
     <div class="scroll-zone top" id="scroll-zone-top"><i class="fas fa-chevron-up"></i></div>
     <div class="scroll-zone bottom" id="scroll-zone-bottom"><i class="fas fa-chevron-down"></i></div>
-
-    <!-- JS Libraries -->
+    
+    <!-- LeaderLine for graph (which you already had) -->
     <script src="https://cdn.jsdelivr.net/npm/leader-line-new@1.1.9/leader-line.min.js"></script>
+    <!-- Link to the JS file -->
     <script src="script.js"></script>
 </body>
 </html>
-
-
