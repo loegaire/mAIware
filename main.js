@@ -4,22 +4,18 @@ const { startFileMonitor } = require('./autoscan.js') //
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 1200, // Made window wider for the UI
+    width: 1400, // Made window wider for the UI
     height: 900,
     webPreferences: {
-      // --- THIS IS THE CRITICAL CHANGE ---
-      // Tell Electron to use your new preload script
-      preload: path.join(__dirname, 'preload.js') //
+      // This line loads your bridge
+      preload: path.join(__dirname, 'preload.js') 
       // ---------------------------------
     }
   })
 
   win.loadFile('index.html') //
   
-  // --- ADD THIS ---
-  // Return the win object so we can pass it to the monitor
   return win
-  // ----------------
 }
 
 app.whenReady().then(() => {
@@ -27,6 +23,7 @@ app.whenReady().then(() => {
   const win = createWindow() //
 
   // --- PASS 'win' TO THE MONITOR ---
+  // This allows autoscan.js to send messages to the UI
   startFileMonitor(win) //
   // ---------------------------------
 
