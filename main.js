@@ -1,8 +1,12 @@
 const { app, BrowserWindow } = require('electron/main')
 const path = require('node:path')
 const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
+const { onMonitorEvent } = require('./monitor-runtime')
+const { determinePeStatus } = require('./file-type-detector')
 
 let backgroundControllerModule = null
+let mainWindow = null
+let cachedDownloadsPath = null
 try {
   backgroundControllerModule = require('./background-controller')
 } catch (err) {
@@ -85,6 +89,74 @@ const setupBackgroundController =
 
 const isBackgroundOnly = process.argv.includes('--background') //
 
+const pendingFileMetadata = new Map()
+
+const getDownloadsPath = () => {
+  if (!cachedDownloadsPath) {
+    try {
+      cachedDownloadsPath = app.getPath('downloads')
+    } catch (err) {
+      console.warn('[FileType] Failed to resolve downloads path:', err.message)
+      cachedDownloadsPath = null
+    }
+  }
+
+  return cachedDownloadsPath
+}
+
+const dispatchMetadataUpdate = (filename, metadata) => {
+  if (!filename) {
+    return
+  }
+
+  const payload = { filename, ...metadata }
+  pendingFileMetadata.set(filename, payload)
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('scan-file-metadata', payload)
+    } catch (err) {
+      console.warn('[FileType] Failed to send metadata to renderer:', err.message)
+    }
+  }
+}
+
+const inspectFileForPe = async (filename) => {
+  const downloadsPath = getDownloadsPath()
+  if (!downloadsPath || !filename) {
+    return
+  }
+
+  const fullPath = path.join(downloadsPath, filename)
+
+  try {
+    const status = await determinePeStatus(fullPath)
+    dispatchMetadataUpdate(filename, status)
+  } catch (err) {
+    dispatchMetadataUpdate(filename, {
+      isPe: false,
+      error: err instanceof Error ? err.message : String(err)
+    })
+  }
+}
+
+const handleScanResultMetadata = (scanResult) => {
+  if (!scanResult || typeof scanResult !== 'object') {
+    return
+  }
+
+  const detectedFilename = scanResult.detected_filename
+  if (!detectedFilename) {
+    return
+  }
+
+  const metadata = pendingFileMetadata.get(detectedFilename)
+  if (metadata) {
+    dispatchMetadataUpdate(detectedFilename, metadata)
+    pendingFileMetadata.delete(detectedFilename)
+  }
+}
+
 let backgroundController = null
 
 const createWindow = () => {
@@ -97,14 +169,27 @@ const createWindow = () => {
     }
   })
 
+  mainWindow = win
+
   win.on('ready-to-show', () => {
     if (!isBackgroundOnly) {
       win.show()
     }
+
+    pendingFileMetadata.forEach((metadata) => {
+      try {
+        win.webContents.send('scan-file-metadata', metadata)
+      } catch (err) {
+        console.warn('[FileType] Failed to replay metadata to renderer:', err.message)
+      }
+    })
   })
 
   win.on('closed', () => {
     attachWindow(null)
+    if (mainWindow === win) {
+      mainWindow = null
+    }
   })
 
   win.loadFile('index.html') //
@@ -128,6 +213,14 @@ app.whenReady().then(() => {
   }
 
   startMonitorWorker(win) //
+
+  onMonitorEvent((channel, payload) => {
+    if (channel === 'scan-started') {
+      inspectFileForPe(payload)
+    } else if (channel === 'scan-result') {
+      handleScanResultMetadata(payload)
+    }
+  })
 
   app.on('activate', () => { //
     backgroundController.showWindow()

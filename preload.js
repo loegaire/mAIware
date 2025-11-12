@@ -5,7 +5,10 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   // Listen for the "scan-started" message
   onScanStarted: (callback) => ipcRenderer.on('scan-started', (_event, filename) => callback(filename)),
-  
+
   // Listen for the "scan-result" message
-  onScanResult: (callback) => ipcRenderer.on('scan-result', (_event, scanResult) => callback(scanResult))
+  onScanResult: (callback) => ipcRenderer.on('scan-result', (_event, scanResult) => callback(scanResult)),
+
+  // Listen for PE metadata updates
+  onScanFileMetadata: (callback) => ipcRenderer.on('scan-file-metadata', (_event, metadata) => callback(metadata))
 })
