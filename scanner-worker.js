@@ -15,7 +15,7 @@ const FormData = require('form-data')
 const { getRandomDemoJson } = require('./jsonsamples') //
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
-const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 //
+const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
 const DEFAULT_SCAN_DELAY_MS = 10000
 
 const fileQueue = [] //
