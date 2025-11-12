@@ -9,6 +9,7 @@ try {
 const path = require('node:path')
 const fs = require('node:fs')
 const fsPromises = require('node:fs').promises
+const crypto = require('node:crypto')
 const axios = require('axios')
 const FormData = require('form-data')
 const { getRandomDemoJson } = require('./jsonsamples') //
@@ -110,7 +111,14 @@ async function handleSmallFile(filePath, detectedFilename) {
     postLog(`[Scan] Scanning for ${detectedFilename}...`)
     await delay(SCAN_DELAY_MS)
 
-    const scanResult = getRandomDemoJson(detectedFilename)
+    let fileHashes = null
+    try {
+      fileHashes = await computeFileHashes(filePath)
+    } catch (err) {
+      postError(`[Hash] Failed to compute hashes for ${detectedFilename}: ${err.message}`)
+    }
+
+    const scanResult = getRandomDemoJson(detectedFilename, fileHashes)
 
     postLog(`[Scan] Scan completed. (Triggered by ${detectedFilename})`)
     parentPort.postMessage({ channel: 'scan-result', payload: scanResult })
@@ -199,6 +207,34 @@ function queueManualScan(filePath) {
   fileQueue.push(normalized)
   postLog(`[Monitor] Manually queued file: ${normalized}`)
   processQueue()
+}
+
+function computeFileHashes(filePath) {
+  return new Promise((resolve, reject) => {
+    const sha256 = crypto.createHash('sha256')
+    const md5 = crypto.createHash('md5')
+    const stream = fs.createReadStream(filePath)
+
+    stream.on('data', (chunk) => {
+      sha256.update(chunk)
+      md5.update(chunk)
+    })
+
+    stream.on('error', (err) => {
+      reject(err)
+    })
+
+    stream.on('end', () => {
+      try {
+        resolve({
+          sha256: sha256.digest('hex'),
+          md5: md5.digest('hex')
+        })
+      } catch (err) {
+        reject(err)
+      }
+    })
+  })
 }
 
 async function handleShutdownRequest() {

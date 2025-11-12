@@ -55,7 +55,7 @@ const rawSamples = [
  * @param {string} detectedFilename - The name of the file that was actually detected.
  * @returns {object} A final, human-readable JSON object.
  */
-function getRandomDemoJson(detectedFilename) {
+function getRandomDemoJson(detectedFilename, fileHashes) {
   // 1. Pick a random raw sample definition
   const rawSample = rawSamples[Math.floor(Math.random() * rawSamples.length)];
   const classification = CLASSIFICATION[rawSample.c];
@@ -65,9 +65,14 @@ function getRandomDemoJson(detectedFilename) {
   const apiImports = API_SETS[rawSample.apiSet] || [];
 
   // 3. Build the final, readable JSON object
+  const hashValues =
+    fileHashes && fileHashes.sha256 && fileHashes.md5
+      ? fileHashes
+      : getFakeHashes(detectedFilename);
+
   const finalJson = {
     "detected_filename": detectedFilename,
-    "file_hashes": getFakeHashes(detectedFilename),
+    "file_hashes": hashValues,
     "classification": classification,
     "malware_family": rawSample.fam !== undefined ? MALWARE_FAMILIES[rawSample.fam] : null,
     "confidence_score": (Math.random() * (0.99 - 0.55) + 0.55).toFixed(2),
