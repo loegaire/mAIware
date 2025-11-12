@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron/main')
 const path = require('node:path')
-const { startMonitorWorker, attachWindow } = require('./autoscan.js') //
+const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
 const { setupBackgroundController } = require('./background-controller')
 
 const isBackgroundOnly = process.argv.includes('--background') //
