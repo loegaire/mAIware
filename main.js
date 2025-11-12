@@ -1,36 +1,64 @@
 const { app, BrowserWindow } = require('electron/main')
 const path = require('node:path')
-const { startFileMonitor } = require('./autoscan.js') //
+const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
+const backgroundControllerModule = require('./background-controller')
+
+const setupBackgroundController = typeof backgroundControllerModule.setupBackgroundController === 'function'
+  ? backgroundControllerModule.setupBackgroundController
+  : () => ({
+    showWindow: () => {},
+    hideWindow: () => {},
+    toggleWindow: () => {}
+  })
+
+const isBackgroundOnly = process.argv.includes('--background') //
+
+let backgroundController = null
 
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 1400, // Made window wider for the UI
     height: 900,
+    show: !isBackgroundOnly,
     webPreferences: {
-      // This line loads your bridge
-      preload: path.join(__dirname, 'preload.js') 
-      // ---------------------------------
+      preload: path.join(__dirname, 'preload.js')
     }
   })
 
+  win.on('ready-to-show', () => {
+    if (!isBackgroundOnly) {
+      win.show()
+    }
+  })
+
+  win.on('closed', () => {
+    attachWindow(null)
+  })
+
   win.loadFile('index.html') //
-  
+
+  attachWindow(win)
+
   return win
 }
 
-app.whenReady().then(() => {
-  // --- CATCH THE 'win' OBJECT ---
-  const win = createWindow() //
+backgroundController = setupBackgroundController({
+  app,
+  createWindow,
+  isBackgroundOnly
+})
 
-  // --- PASS 'win' TO THE MONITOR ---
-  // This allows autoscan.js to send messages to the UI
-  startFileMonitor(win) //
-  // ---------------------------------
+app.whenReady().then(() => {
+  let win = null
+
+  if (!isBackgroundOnly) {
+    win = createWindow() //
+  }
+
+  startMonitorWorker(win) //
 
   app.on('activate', () => { //
-    if (BrowserWindow.getAllWindows().length === 0) { //
-      createWindow() //
-    }
+    backgroundController.showWindow()
   })
 })
 
