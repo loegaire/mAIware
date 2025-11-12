@@ -1,4 +1,3 @@
-const crypto = require('node:crypto');
 const {
   VENDORS,
   SIGNATURES,
@@ -11,13 +10,6 @@ const {
   CLASSIFICATION,
   ENTROPY_SECTIONS
 } = require('./datasrcs');
-
-// Generates fake hashes for the demo report.
-const getFakeHashes = (filename) => {
-  const md5 = crypto.createHash('md5').update(filename + Date.now()).digest('hex');
-  const sha256 = crypto.createHash('sha256').update(filename + Date.now()).digest('hex');
-  return { md5, sha256 };
-};
 
   // This is our list of 20 "raw" samples.
 const rawSamples = [
@@ -48,14 +40,13 @@ const rawSamples = [
   { name: "report.pdf.exe", c: 2, f: 0, v: 13, p: 0, s: 4, apiSet: 10, strings: [0, 11, 12], fam: 7, e: [{s:0, v:6.8}, {s:1, v:7.2}] }
 ];
 
-// --- generateGraphData() function has been REMOVED from this file ---
-
 /**
  * Builds a human-readable JSON report by mapping raw sample data.
  * @param {string} detectedFilename - The name of the file that was actually detected.
+ * @param {object} realHashes - The object {md5: '...', sha256: '...'}
  * @returns {object} A final, human-readable JSON object.
  */
-function getRandomDemoJson(detectedFilename) {
+function getRandomDemoJson(detectedFilename, hashes) {
   // 1. Pick a random raw sample definition
   const rawSample = rawSamples[Math.floor(Math.random() * rawSamples.length)];
   const classification = CLASSIFICATION[rawSample.c];
@@ -67,25 +58,24 @@ function getRandomDemoJson(detectedFilename) {
   // 3. Build the final, readable JSON object
   const finalJson = {
     "detected_filename": detectedFilename,
-    "file_hashes": getFakeHashes(detectedFilename),
+    "file_hashes": hashes,
     "classification": classification,
     "malware_family": rawSample.fam !== undefined ? MALWARE_FAMILIES[rawSample.fam] : null,
     "confidence_score": (Math.random() * (0.99 - 0.55) + 0.55).toFixed(2),
-    "vendor": VENDORS[rawSample.v], // This is now an object {name, icon}
+    "vendor": VENDORS[rawSample.v], 
     "key_findings": {
       "file_type": FILE_TYPES[rawSample.f], 
       "packer_detected": PACKERS[rawSample.p], 
-      "signature": SIGNATURES[rawSample.s], // This is now an object {name, icon, level}
+      "signature": SIGNATURES[rawSample.s], 
       "section_entropy": rawSample.e.map(entry => ({
         name: ENTROPY_SECTIONS[entry.s],
         entropy: entry.v
       })),
-      "api_imports": apiImports, // <-- RENAMED and simplified
+      "api_imports": apiImports, 
       "key_strings": (rawSample.c === 0) 
         ? rawSample.strings.map(index => BENIGN_STRINGS[index]) 
         : rawSample.strings.map(index => SUSPICIOUS_STRINGS[index]) 
     }
-    // 4. "graphData" key is GONE.
   };
 
   // Clean up empty fields for a tidier output

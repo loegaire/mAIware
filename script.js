@@ -59,6 +59,7 @@ const progressBarFill = document.getElementById('progress-bar-fill');
 const scorePercentage = document.getElementById('score-percentage');
 const detailsReasoning = document.getElementById('details-reasoning'); // We'll reuse this
 const detailsHash = document.getElementById('details-hash');
+const detailsHashMd5 = document.getElementById('details-hash-md5');
 const detailsRecommendation = document.getElementById('details-recommendation');
 const detailsVendor = document.getElementById('details-vendor');
 const detailsSignature = document.getElementById('details-signature');
@@ -193,6 +194,7 @@ window.electronAPI.onScanResult((scanResult) => {
   // Use 'detailsReasoning' for file type / packer
   detailsReasoning.textContent = `Filetype: ${scanResult.key_findings.file_type}. Packer: ${scanResult.key_findings.packer_detected}.`; //
   detailsHash.textContent = scanResult.file_hashes.sha256; //
+  detailsHashMd5.textContent = scanResult.file_hashes.md5;
   detailsRecommendation.textContent = recommendation;
   
   // --- Call all UI helper functions ---
@@ -226,6 +228,7 @@ function clearResultData() {
     scorePercentage.textContent = `0%`;
     detailsReasoning.textContent = '...';
     detailsHash.textContent = '...';
+    detailsHashMd5.textContent = '...';
     detailsRecommendation.textContent = '...';
 
     // Clear vendor
