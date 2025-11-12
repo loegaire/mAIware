@@ -31,6 +31,12 @@ const createWindow = () => {
   return win
 }
 
+backgroundController = setupBackgroundController({
+  app,
+  createWindow,
+  isBackgroundOnly
+})
+
 app.whenReady().then(() => {
   let win = null
 
