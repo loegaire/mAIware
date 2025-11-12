@@ -1,19 +1,8 @@
 const { app, BrowserWindow } = require('electron/main')
 const path = require('node:path')
-const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
-const backgroundControllerModule = require('./background-controller')
-
-const setupBackgroundController = typeof backgroundControllerModule.setupBackgroundController === 'function'
-  ? backgroundControllerModule.setupBackgroundController
-  : () => ({
-    showWindow: () => {},
-    hideWindow: () => {},
-    toggleWindow: () => {}
-  })
+const { startFileMonitor, attachWindow } = require('./autoscan.js') //
 
 const isBackgroundOnly = process.argv.includes('--background') //
-
-let backgroundController = null
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -55,10 +44,12 @@ app.whenReady().then(() => {
     win = createWindow() //
   }
 
-  startMonitorWorker(win) //
+  startFileMonitor(win) //
 
   app.on('activate', () => { //
-    backgroundController.showWindow()
+    if (BrowserWindow.getAllWindows().length === 0 && !isBackgroundOnly) { //
+      win = createWindow() //
+    }
   })
 })
 
