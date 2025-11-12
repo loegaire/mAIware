@@ -1,6 +1,7 @@
-const { app, BrowserWindow } = require('electron/main')
+const { app, BrowserWindow, ipcMain } = require('electron/main')
 const path = require('node:path')
 const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
+const { getPrimaryIPv4 } = require('./system-info')
 
 let backgroundControllerModule = null
 try {
@@ -118,6 +119,10 @@ backgroundController = setupBackgroundController({
   app,
   createWindow,
   isBackgroundOnly
+})
+
+ipcMain.handle('system-info:get-ip', async () => {
+  return getPrimaryIPv4()
 })
 
 app.whenReady().then(() => {
