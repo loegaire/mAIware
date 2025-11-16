@@ -4,8 +4,10 @@ const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
 const { onMonitorEvent } = require('./monitor-runtime')
 const { determinePeStatus } = require('./file-type-detector')
 const { getPrimaryIPv4 } = require('./system-info')
+const Store = require('electron-store')
 
 let backgroundControllerModule = null
+const store = new Store()
 let mainWindow = null
 let cachedDownloadsPath = null
 try {
@@ -216,6 +218,9 @@ backgroundController = setupBackgroundController({
   isBackgroundOnly
 })
 
+ipcMain.handle('history:get', async () => { // <-- ADD THIS BLOCK
+  return store.get('scanHistory', []) // '[]' is the default if no history exists
+})
 ipcMain.handle('system-info:get-ip', async () => {
   return getPrimaryIPv4()
 })
@@ -234,6 +239,22 @@ app.whenReady().then(() => {
       inspectFileForPe(payload)
     } else if (channel === 'scan-result') {
       handleScanResultMetadata(payload)
+
+      try {
+        const history = store.get('scanHistory', [])
+        const scanEntry = {
+          ...payload,
+          scanDate: new Date().toISOString() // Add a timestamp
+        }
+        history.unshift(scanEntry) // .unshift() adds to the beginning
+        
+        // Keep only the 100 most recent scans (optional)
+        const trimmedHistory = history.slice(0, 100) 
+        
+        store.set('scanHistory', trimmedHistory)
+      } catch (err) {
+        console.error("Failed to save scan history:", err)
+      }
     }
   })
 

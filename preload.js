@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Listen for PE metadata updates
   onScanFileMetadata: (callback) => ipcRenderer.on('scan-file-metadata', (_event, metadata) => callback(metadata)),
 
-  getSystemIp: () => ipcRenderer.invoke('system-info:get-ip')
+  getSystemIp: () => ipcRenderer.invoke('system-info:get-ip'),
+  getHistory: () => ipcRenderer.invoke('history:get')
 })
