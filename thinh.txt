@@ -1,3 +1,4 @@
+scanner-worker.js
 monitor-runtime.js
-dashboard-publisher.js
-thinh.txt
+background-controller.js
+

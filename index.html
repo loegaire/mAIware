@@ -45,8 +45,23 @@
                 <div id="result-state" class="scanner-state"> <i class="result-icon" id="result-icon"></i>
                     <h2 id="result-text"></h2>
                     <div class="filename" id="result-filename"></div>
-                    <p id="result-details"></p> 
+                    <p id="result-details"></p>
                     <!-- Removed the resetDemo() button as it's automatic now -->
+                </div>
+                <div id="non-pe-result" class="scanner-state non-pe-result">
+                    <div class="non-pe-icon"><i class="fas fa-file"></i></div>
+                    <h2 id="non-pe-title">File is not a Windows PE executable</h2>
+                    <p class="filename" id="non-pe-filename"></p>
+                    <div class="non-pe-hash-grid">
+                        <div class="non-pe-hash">
+                            <h4>SHA256</h4>
+                            <p id="non-pe-hash-sha256">...</p>
+                        </div>
+                        <div class="non-pe-hash">
+                            <h4>MD5</h4>
+                            <p id="non-pe-hash-md5">...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -86,7 +101,17 @@
                 
                 <div class="details-section">
                     <h4>SHA256 Hash</h4>
-                    <p class="hash-text" id="details-hash">...</p>
+                    <p class="hash-text" id="details-hash-sha256">...</p>
+                </div>
+
+                <div class="details-section">
+                    <h4>MD5 Hash</h4>
+                    <p class="hash-text" id="details-hash-md5">...</p>
+                </div>
+
+                <div class="details-section">
+                    <h4>System IP</h4>
+                    <p class="hash-text" id="details-system-ip">Detecting...</p>
                 </div>
 
                 <div class="details-section">

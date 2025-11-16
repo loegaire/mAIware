@@ -45,6 +45,10 @@ const resultIcon = document.getElementById('result-icon');
 const resultText = document.getElementById('result-text');
 const resultFilename = document.getElementById('result-filename');
 const resultDetails = document.getElementById('result-details');
+const nonPeResultWrapper = document.getElementById('non-pe-result');
+const nonPeFilename = document.getElementById('non-pe-filename');
+const nonPeHashSha256 = document.getElementById('non-pe-hash-sha256');
+const nonPeHashMd5 = document.getElementById('non-pe-hash-md5');
 
 const bodyEl = document.body;
 let animationWrapper = null;
@@ -58,7 +62,9 @@ const analysisDetailsWrapper = document.getElementById('analysis-details-wrapper
 const progressBarFill = document.getElementById('progress-bar-fill');
 const scorePercentage = document.getElementById('score-percentage');
 const detailsReasoning = document.getElementById('details-reasoning'); // We'll reuse this
-const detailsHash = document.getElementById('details-hash');
+const detailsHashSha256 = document.getElementById('details-hash-sha256');
+const detailsHashMd5 = document.getElementById('details-hash-md5');
+const detailsSystemIp = document.getElementById('details-system-ip');
 const detailsRecommendation = document.getElementById('details-recommendation');
 const detailsVendor = document.getElementById('details-vendor');
 const detailsSignature = document.getElementById('details-signature');
@@ -88,16 +94,23 @@ const statsWrapper = document.getElementById('stats-wrapper');
 let disassemblyInterval = null;
 let scrollInterval = null; // For auto-scrolling
 let currentGraphLines = []; // Renamed from currentLines to avoid conflict
+let currentFileMetadata = null;
+let lastScanResult = null;
 
 // 1. Listen for the 'scan-started' message from the backend
 window.electronAPI.onScanStarted((filename) => {
   console.log(`UI: Received scan-started for ${filename}`);
-  
+
   // 1. Set UI to "Analyzing" state
   initialState.classList.remove('active'); //
   analyzingState.classList.add('active'); //
   analyzingFilename.textContent = filename; //
   disassemblyFilenameEl.textContent = filename; //
+
+  currentFileMetadata = { filename, isPe: true };
+  lastScanResult = null;
+  nonPeResultWrapper.classList.remove('active');
+  bodyEl.classList.remove('is-non-pe');
 
   // 2. Update body class to show disassembly
   bodyEl.classList.remove('is-showing-result'); //
@@ -113,25 +126,71 @@ window.electronAPI.onScanStarted((filename) => {
   clearResultData();
 });
 
-// 2. Listen for the 'scan-result' message 
+// 2. Listen for the 'scan-result' message
 window.electronAPI.onScanResult((scanResult) => {
   console.log("UI: Received scan-result:", scanResult);
 
-  // 1. Stop disassembly animation
   clearInterval(disassemblyInterval); //
   disassemblyInterval = null; //
 
-  // 2. Update body classes
   bodyEl.classList.remove('is-analyzing'); //
   bodyEl.classList.add('is-showing-result'); //
-  
-  // 3. Show "Result" state in scanner
+
   analyzingState.classList.remove('active'); //
   resultState.classList.add('active'); //
 
-  // --- 4. MAP YOUR JSON DATA TO THE UI ---
+  lastScanResult = scanResult;
 
-  // Determine result type
+  renderScanResult();
+});
+
+window.electronAPI.onScanFileMetadata((metadata) => {
+  if (!metadata || typeof metadata !== 'object') {
+    return;
+  }
+
+  currentFileMetadata = metadata;
+
+  if (lastScanResult && metadata.filename === lastScanResult.detected_filename) {
+    renderScanResult();
+  }
+});
+
+function renderScanResult() {
+  if (!lastScanResult) {
+    return;
+  }
+
+  const metadataMatches = currentFileMetadata && currentFileMetadata.filename === lastScanResult.detected_filename;
+  const isNonPe = metadataMatches && currentFileMetadata.isPe === false;
+
+  if (isNonPe) {
+    renderNonPeResult(lastScanResult);
+    return;
+  }
+
+  renderPeResult(lastScanResult);
+}
+
+function ensureAnimationWrapper() {
+  if (animationWrapper) {
+    return;
+  }
+
+  animationWrapper = document.createElement('div');
+  animationWrapper.className = 'animation-swarm';
+  for (let i = 0; i < 10; i++) {
+    const particle = document.createElement('span');
+    animationWrapper.appendChild(particle);
+  }
+  bodyEl.prepend(animationWrapper);
+}
+
+function renderPeResult(scanResult) {
+  removeAnimationClasses();
+  bodyEl.classList.remove('is-non-pe');
+  nonPeResultWrapper.classList.remove('active');
+
   let resultIconClass = 'fas fa-check-circle'; //
   let resultMockDisassembly = mockDisassemblyBenign; //
   let resultBodyClass = 'result-safe-active'; //
@@ -140,15 +199,15 @@ window.electronAPI.onScanResult((scanResult) => {
   let resultScoreClass = 'score-green'; //
   let recommendation = 'You can safely run this file.'; //
 
-  if (scanResult.classification.includes("Malware")) {
-    resultIconClass = 'fas fa-bug'; 
-    resultMockDisassembly = mockDisassemblyMalware; 
+  if (scanResult.classification.includes('Malware')) {
+    resultIconClass = 'fas fa-bug';
+    resultMockDisassembly = mockDisassemblyMalware;
     resultBodyClass = 'result-malware-active'; //
     resultScannerClass = 'result-malware'; //
     resultProgressClass = 'progress-bar-red'; //
     resultScoreClass = 'score-red'; //
     recommendation = 'DO NOT OPEN. Quarantine this file immediately.'; //
-  } else if (scanResult.classification.includes("Suspicious")) {
+  } else if (scanResult.classification.includes('Suspicious')) {
     resultIconClass = 'fas fa-exclamation-triangle'; //
     resultMockDisassembly = mockDisassemblySuspicious; //
     resultBodyClass = 'result-suspicious-active'; //
@@ -157,24 +216,14 @@ window.electronAPI.onScanResult((scanResult) => {
     resultScoreClass = 'score-yellow'; //
     recommendation = 'Be cautious. Only run if you trust the source.'; //
   }
-  
-  // Create the animation wrapper
-  if (!animationWrapper) {
-      animationWrapper = document.createElement('div');
-      animationWrapper.className = 'animation-swarm';
-      for (let i = 0; i < 10; i++) {
-          const particle = document.createElement('span');
-          animationWrapper.appendChild(particle);
-      }
-      bodyEl.prepend(animationWrapper);
-  }
+
+  ensureAnimationWrapper();
   bodyEl.classList.add(resultBodyClass); //
 
-  // 5. Populate Scanner Panel
   resultState.className = `scanner-state active ${resultScannerClass}`; //
   resultIcon.className = `result-icon ${resultIconClass}`; //
   resultText.textContent = scanResult.classification; //
-  
+
   let detailsText = `Scanned ${scanResult.detected_filename}.`;
   if (scanResult.malware_family) {
     detailsText = `Family: ${scanResult.malware_family}`;
@@ -182,35 +231,59 @@ window.electronAPI.onScanResult((scanResult) => {
   resultDetails.textContent = detailsText;
   resultFilename.textContent = scanResult.detected_filename; //
 
-  // 6. Populate Analysis Details Panel
   progressBarFill.className = 'progress-bar-fill'; //
   scorePercentage.className = 'score-percentage'; //
   progressBarFill.classList.add(resultProgressClass); //
-  progressBarFill.style.width = `${scanResult.confidence_score * 100}%`; //
-  scorePercentage.textContent = `${(scanResult.confidence_score * 100).toFixed(0)}%`; //
+  const rawConfidence = Number(scanResult.confidence_score);
+  const confidenceValue = Number.isFinite(rawConfidence) ? rawConfidence * 100 : 0;
+  progressBarFill.style.width = `${confidenceValue}%`; //
+  scorePercentage.textContent = `${Math.round(confidenceValue)}%`; //
   scorePercentage.classList.add(resultScoreClass); //
-  
-  // Use 'detailsReasoning' for file type / packer
+
   detailsReasoning.textContent = `Filetype: ${scanResult.key_findings.file_type}. Packer: ${scanResult.key_findings.packer_detected}.`; //
-  detailsHash.textContent = scanResult.file_hashes.sha256; //
+  const hashData = scanResult.file_hashes || {};
+  detailsHashSha256.textContent = hashData.sha256 || 'Not available'; //
+  detailsHashMd5.textContent = hashData.md5 || 'Not available'; //
+  updateSystemIpDisplay();
   detailsRecommendation.textContent = recommendation;
-  
-  // --- Call all UI helper functions ---
+
   populateVendor(scanResult.vendor); //
   populateSignature(scanResult.key_findings.signature); //
   populateEntropyBars(scanResult.key_findings.section_entropy || []); //
   populateKeyStrings(scanResult.key_findings.key_strings || [], scanResult.classification); //
 
-  // 7. Populate Disassembly & Graph
   populateDisassembly(resultMockDisassembly); //
-  
-  // Get the simple array of API names from the JSON
+
   const apiList = scanResult.key_findings.api_imports || [];
-  // Generate the complex graph object *here in the UI*
   const graphData = generateGraphData(apiList, scanResult.classification);
-  // Pass the new graph object to the drawing function
   drawCallGraph(graphData);
-});
+}
+
+function renderNonPeResult(scanResult) {
+  removeAnimationClasses();
+  bodyEl.classList.add('is-non-pe');
+  resultState.className = 'scanner-state active';
+  resultIcon.className = 'result-icon fas fa-file';
+  resultText.textContent = '';
+  resultDetails.textContent = '';
+  resultFilename.textContent = '';
+
+  const hashData = scanResult.file_hashes || {};
+  nonPeFilename.textContent = scanResult.detected_filename || '';
+  nonPeHashSha256.textContent = hashData.sha256 || 'Not available';
+  nonPeHashMd5.textContent = hashData.md5 || 'Not available';
+
+  detailsHashSha256.textContent = hashData.sha256 || 'Not available';
+  detailsHashMd5.textContent = hashData.md5 || 'Not available';
+
+  nonPeResultWrapper.classList.add('active');
+
+  callGraphEl.innerHTML = '';
+  currentGraphLines.forEach(line => line.remove());
+  currentGraphLines = [];
+  entropyBarsContainer.innerHTML = '';
+  keyStringsContainer.innerHTML = '';
+}
 
 /**
  * Clears all dynamic result data to prepare for the next scan.
@@ -220,12 +293,21 @@ function clearResultData() {
     resultText.textContent = '';
     resultDetails.textContent = '';
     resultFilename.textContent = '';
-    
+    nonPeResultWrapper.classList.remove('active');
+    nonPeFilename.textContent = '';
+    nonPeHashSha256.textContent = '...';
+    nonPeHashMd5.textContent = '...';
+    bodyEl.classList.remove('is-non-pe');
+
     // Clear analysis panel
     progressBarFill.style.width = `0%`;
     scorePercentage.textContent = `0%`;
     detailsReasoning.textContent = '...';
-    detailsHash.textContent = '...';
+    detailsHashSha256.textContent = '...';
+    detailsHashMd5.textContent = '...';
+    if (detailsSystemIp) {
+        detailsSystemIp.textContent = 'Detecting...';
+    }
     detailsRecommendation.textContent = '...';
 
     // Clear vendor
@@ -325,6 +407,27 @@ function populateKeyStrings(strings, classification) {
         tag.textContent = str;
         keyStringsContainer.appendChild(tag);
     });
+}
+
+function updateSystemIpDisplay() {
+    if (!detailsSystemIp || !window.electronAPI || typeof window.electronAPI.getSystemIp !== 'function') {
+        return;
+    }
+
+    detailsSystemIp.textContent = 'Detecting...';
+
+    window.electronAPI.getSystemIp()
+        .then((ip) => {
+            if (!ip) {
+                detailsSystemIp.textContent = 'Unavailable';
+                return;
+            }
+
+            detailsSystemIp.textContent = ip;
+        })
+        .catch(() => {
+            detailsSystemIp.textContent = 'Unavailable';
+        });
 }
 
 function removeAnimationClasses() {

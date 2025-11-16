@@ -2,33 +2,6 @@ const { app } = require('electron')
 const path = require('node:path')
 const { Worker } = require('node:worker_threads')
 
-let dashboardPublisher = null
-
-function createSafeDashboardPublisher() {
-  try {
-    const { createDashboardPublisher } = require('./dashboard-publisher')
-    return createDashboardPublisher()
-  } catch (err) {
-    console.warn('[Dashboard] Publisher unavailable, continuing without remote telemetry.', err.message)
-    return {
-      enqueue: () => {},
-      flush: async () => {},
-      close: async () => {},
-    }
-  }
-}
-
-dashboardPublisher = createSafeDashboardPublisher()
-
-const DASHBOARD_CHANNELS = new Set([
-  'scan-started',
-  'scan-result',
-  'log',
-  'error',
-  'ready',
-  'shutdown-complete',
-])
-
 let monitorWorker = null
 let attachedWindow = null
 const monitorListeners = new Set()
@@ -73,26 +46,6 @@ function notifyListeners(channel, payload) {
       console.error('[Monitor] Listener error:', err)
     }
   })
-
-  publishToDashboard(channel, payload)
-}
-
-function publishToDashboard(channel, payload) {
-  if (!dashboardPublisher || !DASHBOARD_CHANNELS.has(channel)) {
-    return
-  }
-
-  try {
-    dashboardPublisher.enqueue({ channel, payload })
-
-    if (channel === 'shutdown-complete') {
-      dashboardPublisher.close().catch((err) => {
-        console.error('[Dashboard] Failed to close publisher:', err)
-      })
-    }
-  } catch (err) {
-    console.error('[Dashboard] Failed to enqueue event:', err)
-  }
 }
 
 function resolveDownloadPath() {
@@ -139,12 +92,6 @@ function ensureWorker() {
     monitorWorker = null
     stoppingWorker = false
 
-    if (dashboardPublisher && typeof dashboardPublisher.flush === 'function') {
-      dashboardPublisher.flush().catch((err) => {
-        console.error('[Dashboard] Failed to flush events after worker exit:', err)
-      })
-    }
-
     if (!wasStopping && code !== 0) {
       console.warn(`[Monitor] Worker exited unexpectedly with code ${code}. Restarting...`)
       ensureWorker()
@@ -169,12 +116,6 @@ function stopMonitorWorker() {
 
   stoppingWorker = true
   monitorWorker.postMessage({ type: 'shutdown' })
-
-  if (dashboardPublisher && typeof dashboardPublisher.flush === 'function') {
-    dashboardPublisher.flush().catch((err) => {
-      console.error('[Dashboard] Failed to flush events during shutdown:', err)
-    })
-  }
 }
 
 module.exports = {
