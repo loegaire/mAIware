@@ -9,6 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Listen for the "scan-result" message
   onScanResult: (callback) => ipcRenderer.on('scan-result', (_event, scanResult) => callback(scanResult)),
 
-  // Request the system IP address from the main process
-  getSystemIp: () => ipcRenderer.invoke('system-info:get-ip')
+  // Listen for PE metadata updates
+  onScanFileMetadata: (callback) => ipcRenderer.on('scan-file-metadata', (_event, metadata) => callback(metadata))
 })
