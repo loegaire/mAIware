@@ -86,6 +86,26 @@ async function processQueue() {
   }
 }
 
+async function sendResultToServer(scanResult) {
+  const SERVER_URL = 'http://localhost:3000/api/submit-scan';
+  
+  try {
+    const response = await fetch(SERVER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scanResult)
+    });
+    
+    if (response.ok) {
+      postLog('[Server] Scan result uploaded successfully');
+    } else {
+      postLog(`[Server] Upload failed: ${response.statusText}`);
+    }
+  } catch (error) {
+    postLog(`[Server] Failed to upload: ${error.message}`);
+  }
+}
+
 async function handleSmallFile(filePath, detectedFilename) {
   const uploadTask = async () => {
     if (skipUpload) {
@@ -122,6 +142,9 @@ async function handleSmallFile(filePath, detectedFilename) {
 
     postLog(`[Scan] Scan completed. (Triggered by ${detectedFilename})`)
     parentPort.postMessage({ channel: 'scan-result', payload: scanResult })
+    
+    // Send to server
+    await sendResultToServer(scanResult)
   }
 
   await Promise.all([

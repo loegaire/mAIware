@@ -394,7 +394,8 @@ body.is-showing-result .disassembly-wrapper {
 
 .stats-grid {
     display: flex; 
-    flex-direction: column; /* Force stacking */
+    flex-direction: column;
+    /* Force stacking */
     gap: 1.5rem;
 }
 
@@ -879,41 +880,119 @@ body.is-history-open .history-panel {
     gap: 1rem;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
 }
+
+.history-list li:hover {
+    background-color: var(--bg-dark-3);
+}
+
+.history-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.history-icon-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 60px;
+}
+
 .history-icon {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background-color: var(--bg-dark-3);
 }
-.icon-safe { color: var(--green); }
-.icon-suspicious { color: var(--yellow); }
-.icon-malware { color: var(--red); }
+
+.history-icon.safe {
+    color: var(--green);
+    border: 2px solid var(--green);
+}
+
+.history-icon.suspicious {
+    color: var(--yellow);
+    border: 2px solid var(--yellow);
+}
+
+.history-icon.malware {
+    color: var(--red);
+    border: 2px solid var(--red);
+}
+
+.history-file-type {
+    font-size: 1rem;
+    color: var(--text-medium);
+}
+
 .history-details {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    min-width: 0; /* Allow text truncation */
 }
-.history-file {
+
+.history-filename {
     font-weight: 600;
     color: var(--text-light);
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+.history-classification {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.history-classification.safe {
+    color: var(--green);
+}
+
+.history-classification.suspicious {
+    color: var(--yellow);
+}
+
+.history-classification.malware {
+    color: var(--red);
+}
+
 .history-hash {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 0.85rem;
-    color: var(--text-dark);
+    font-size: 0.75rem;
+    color: var(--text-medium);
+    background-color: var(--bg-dark-3);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    word-break: break-all;
+    line-height: 1.4;
 }
-.history-meta {
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-.history-verdict {
-    font-weight: 600;
-    font-size: 0.9rem;
-}
+
 .history-date {
     font-size: 0.8rem;
     color: var(--text-medium);
+    white-space: nowrap;
+    align-self: flex-start;
+    padding-top: 0.25rem;
+}
+
+.history-item-empty,
+.history-item-loading {
+    color: var(--text-medium);
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
 }
 
 

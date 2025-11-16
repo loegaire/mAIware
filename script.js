@@ -601,7 +601,7 @@ function drawCallGraph(graphData) {
 async function loadHistory() {
   if (!historyListEl) return;
   
-  historyListEl.innerHTML = '<li class="history-item-loading">Loading...</li>'; // Show loading state
+  historyListEl.innerHTML = '<li class="history-item-loading">Loading...</li>';
 
   try {
     const historyData = await window.electronAPI.getHistory();
@@ -611,35 +611,67 @@ async function loadHistory() {
       return;
     }
 
-    historyListEl.innerHTML = ''; // Clear loading state
+    historyListEl.innerHTML = '';
 
     historyData.forEach(scan => {
       const li = document.createElement('li');
       li.className = 'history-item';
 
-      // Determine icon and class based on classification
-      let iconClass = 'fas fa-file';
+      // Determine classification icon
+      let statusIcon = 'fas fa-check-circle';
       let classType = 'safe';
       if (scan.classification.includes('Malware')) {
-        iconClass = 'fas fa-bug';
+        statusIcon = 'fas fa-bug';
         classType = 'malware';
       } else if (scan.classification.includes('Suspicious')) {
-        iconClass = 'fas fa-exclamation-triangle';
+        statusIcon = 'fas fa-exclamation-triangle';
         classType = 'suspicious';
       }
 
+      // Determine file type icon based on extension
+      const filename = scan.detected_filename || '';
+      const ext = filename.split('.').pop().toLowerCase();
+      let fileTypeIcon = 'fas fa-file';
+      
+      if (['exe', 'dll', 'sys', 'msi'].includes(ext)) {
+        fileTypeIcon = 'fas fa-cog'; // Executable
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(ext)) {
+        fileTypeIcon = 'fas fa-image'; // Image
+      } else if (['js', 'ts', 'py', 'java', 'cpp', 'c', 'h', 'cs', 'go', 'rs', 'php', 'rb'].includes(ext)) {
+        fileTypeIcon = 'fas fa-code'; // Code
+      } else if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext)) {
+        fileTypeIcon = 'fas fa-file-alt'; // Document
+      } else if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) {
+        fileTypeIcon = 'fas fa-file-archive'; // Archive
+      } else if (['mp3', 'wav', 'ogg', 'flac', 'aac'].includes(ext)) {
+        fileTypeIcon = 'fas fa-file-audio'; // Audio
+      } else if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv'].includes(ext)) {
+        fileTypeIcon = 'fas fa-file-video'; // Video
+      } else if (['html', 'htm', 'css', 'xml', 'json'].includes(ext)) {
+        fileTypeIcon = 'fas fa-file-code'; // Web file
+      }
+
       const scanDate = new Date(scan.scanDate).toLocaleString();
+      const hashSha256 = scan.file_hashes?.sha256 || 'N/A';
+      const hashDisplay = hashSha256.substring(0, 16) + '...'; // Show first 16 chars
 
       li.innerHTML = `
-        <div class="history-icon ${classType}">
-          <i class="${iconClass}"></i>
+        <div class="history-icon-wrapper">
+          <div class="history-icon ${classType}">
+            <i class="${statusIcon}"></i>
+          </div>
+          <div class="history-file-type">
+            <i class="${fileTypeIcon}"></i>
+          </div>
         </div>
         <div class="history-details">
-          <span class="history-filename">${scan.detected_filename}</span>
+          <span class="history-filename" title="${filename}">${filename}</span>
           <span class="history-classification ${classType}">${scan.classification}</span>
+          <span class="history-hash" title="${hashSha256}">SHA256: ${hashDisplay}</span>
         </div>
         <span class="history-date">${scanDate}</span>
       `;
+      
       historyListEl.appendChild(li);
     });
 
