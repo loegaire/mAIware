@@ -192,6 +192,16 @@ const createWindow = () => {
     }
   })
 
+  win.on('ready-to-show', () => {
+    if (!isBackgroundOnly) {
+      win.show()
+    }
+  })
+
+  win.on('closed', () => {
+    attachWindow(null)
+  })
+
   win.loadFile('index.html') //
 
   attachWindow(win)
