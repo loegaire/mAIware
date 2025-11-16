@@ -3,6 +3,7 @@ const path = require('node:path')
 const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
 const { onMonitorEvent } = require('./monitor-runtime')
 const { determinePeStatus } = require('./file-type-detector')
+const { getPrimaryIPv4 } = require('./system-info')
 
 let backgroundControllerModule = null
 let mainWindow = null
