@@ -64,6 +64,7 @@ const scorePercentage = document.getElementById('score-percentage');
 const detailsReasoning = document.getElementById('details-reasoning'); // We'll reuse this
 const detailsHashSha256 = document.getElementById('details-hash-sha256');
 const detailsHashMd5 = document.getElementById('details-hash-md5');
+const detailsSystemIp = document.getElementById('details-system-ip');
 const detailsRecommendation = document.getElementById('details-recommendation');
 const detailsVendor = document.getElementById('details-vendor');
 const detailsSignature = document.getElementById('details-signature');
@@ -243,6 +244,7 @@ function renderPeResult(scanResult) {
   const hashData = scanResult.file_hashes || {};
   detailsHashSha256.textContent = hashData.sha256 || 'Not available'; //
   detailsHashMd5.textContent = hashData.md5 || 'Not available'; //
+  updateSystemIpDisplay();
   detailsRecommendation.textContent = recommendation;
 
   populateVendor(scanResult.vendor); //
@@ -303,6 +305,9 @@ function clearResultData() {
     detailsReasoning.textContent = '...';
     detailsHashSha256.textContent = '...';
     detailsHashMd5.textContent = '...';
+    if (detailsSystemIp) {
+        detailsSystemIp.textContent = 'Detecting...';
+    }
     detailsRecommendation.textContent = '...';
 
     // Clear vendor
@@ -402,6 +407,27 @@ function populateKeyStrings(strings, classification) {
         tag.textContent = str;
         keyStringsContainer.appendChild(tag);
     });
+}
+
+function updateSystemIpDisplay() {
+    if (!detailsSystemIp || !window.electronAPI || typeof window.electronAPI.getSystemIp !== 'function') {
+        return;
+    }
+
+    detailsSystemIp.textContent = 'Detecting...';
+
+    window.electronAPI.getSystemIp()
+        .then((ip) => {
+            if (!ip) {
+                detailsSystemIp.textContent = 'Unavailable';
+                return;
+            }
+
+            detailsSystemIp.textContent = ip;
+        })
+        .catch(() => {
+            detailsSystemIp.textContent = 'Unavailable';
+        });
 }
 
 function removeAnimationClasses() {
