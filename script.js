@@ -77,6 +77,7 @@ const historyBtn = document.getElementById('history-btn');
 const historyPanel = document.getElementById('history-panel');
 const historyCloseBtn = document.getElementById('history-close-btn');
 const historyOverlay = document.getElementById('history-overlay');
+const historyListEl = document.querySelector('.history-list');
 
 // Scroll Zone elements
 const scrollZoneTop = document.getElementById('scroll-zone-top');
@@ -597,8 +598,64 @@ function drawCallGraph(graphData) {
 
 
 // --- History Panel Logic ---
+async function loadHistory() {
+  if (!historyListEl) return;
+  
+  historyListEl.innerHTML = '<li class="history-item-loading">Loading...</li>'; // Show loading state
+
+  try {
+    const historyData = await window.electronAPI.getHistory();
+
+    if (!historyData || historyData.length === 0) {
+      historyListEl.innerHTML = '<li class="history-item-empty">No scan history found.</li>';
+      return;
+    }
+
+    historyListEl.innerHTML = ''; // Clear loading state
+
+    historyData.forEach(scan => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+
+      // Determine icon and class based on classification
+      let iconClass = 'fas fa-file';
+      let classType = 'safe';
+      if (scan.classification.includes('Malware')) {
+        iconClass = 'fas fa-bug';
+        classType = 'malware';
+      } else if (scan.classification.includes('Suspicious')) {
+        iconClass = 'fas fa-exclamation-triangle';
+        classType = 'suspicious';
+      }
+
+      const scanDate = new Date(scan.scanDate).toLocaleString();
+
+      li.innerHTML = `
+        <div class="history-icon ${classType}">
+          <i class="${iconClass}"></i>
+        </div>
+        <div class="history-details">
+          <span class="history-filename">${scan.detected_filename}</span>
+          <span class="history-classification ${classType}">${scan.classification}</span>
+        </div>
+        <span class="history-date">${scanDate}</span>
+      `;
+      historyListEl.appendChild(li);
+    });
+
+  } catch (err) {
+    console.error('Failed to load history:', err);
+    historyListEl.innerHTML = '<li class="history-item-empty">Error loading history.</li>';
+  }
+}
+
 function toggleHistoryPanel() {
-    bodyEl.classList.toggle('is-history-open');
+  bodyEl.classList.toggle('is-history-open');
+  
+  // ADD THIS: If we are opening the panel, load the history
+  if (bodyEl.classList.contains('is-history-open')) {
+    loadHistory();
+  }
 }
 
 historyBtn.addEventListener('click', (e) => {
