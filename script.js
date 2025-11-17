@@ -732,34 +732,32 @@ scrollZoneBottom.addEventListener('mouseleave', () => {
 });
 
 
-// --- Run on Page Load ---
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Animate Stat Cards
-    const statNumbers = document.querySelectorAll('.stat-number');
-    statNumbers.forEach(stat => {
-        const target = +stat.getAttribute('data-target');
-        const duration = 2000;
-        const stepTime = 20;
-        const steps = duration / stepTime;
-        const increment = target / steps;
-        let current = 0;
+// --- Chart instances ---
+let malwareTypesChart = null;
+let topMalwareChart = null;
 
-        const updateCount = () => {
-            current += increment;
-            if (current < target) {
-                stat.textContent = Math.ceil(current).toLocaleString();
-                setTimeout(updateCount, stepTime);
-            } else {
-                stat.textContent = target.toLocaleString();
-            }
-        };
-        updateCount();
-    });
+// --- Function to create/recreate charts ---
+window.recreateCharts = function() {
+    // Check if light theme is active
+    const isLightTheme = document.body.classList.contains('light-theme');
+    
+    // Set colors based on theme
+    const chartLegendColor = isLightTheme ? '#6c757d' : '#e0e0e0';
+    const chartAxesColor = isLightTheme ? '#6c757d' : '#aaa';
+    const chartGridColor = isLightTheme ? '#dee2e6' : '#444444';
 
-    // 2. Create Malware Types Chart (Doughnut)
+    // Destroy existing charts if they exist
+    if (malwareTypesChart) {
+        malwareTypesChart.destroy();
+    }
+    if (topMalwareChart) {
+        topMalwareChart.destroy();
+    }
+
+    // Create Malware Types Chart (Doughnut)
     const typesCtx = document.getElementById('malwareTypesChart');
     if (typesCtx) {
-        new Chart(typesCtx, {
+        malwareTypesChart = new Chart(typesCtx, {
             type: 'doughnut',
             data: {
                 labels: ['PE (exe/dll)', 'JavaScript', 'VBS', 'Macro', 'Other'],
@@ -783,7 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#e0e0e0', // Text color
+                            color: chartLegendColor,
                             boxWidth: 20
                         }
                     }
@@ -792,10 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Create Top Malware Chart (Line)
+    // Create Top Malware Chart (Line)
     const topMalwareCtx = document.getElementById('topMalwareChart');
     if (topMalwareCtx) {
-        new Chart(topMalwareCtx, {
+        topMalwareChart = new Chart(topMalwareCtx, {
             type: 'line',
             data: {
                 labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
@@ -831,21 +829,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#e0e0e0' // Text color
+                            color: chartLegendColor
                         }
                     }
                 },
                 scales: {
                     x: {
-                        ticks: { color: '#aaa' },
-                        grid: { color: '#44444450' }
+                        ticks: { color: chartAxesColor },
+                        grid: { color: chartGridColor + '50' }
                     },
                     y: {
-                        ticks: { color: '#aaa' },
-                        grid: { color: '#444444' }
+                        ticks: { color: chartAxesColor },
+                        grid: { color: chartGridColor }
                     }
                 }
             }
         });
     }
+};
+
+// --- Run on Page Load ---
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Animate Stat Cards
+    const statNumbers = document.querySelectorAll('.stat-number');
+    statNumbers.forEach(stat => {
+        const target = +stat.getAttribute('data-target');
+        const duration = 2000;
+        const stepTime = 20;
+        const steps = duration / stepTime;
+        const increment = target / steps;
+        let current = 0;
+
+        const updateCount = () => {
+            current += increment;
+            if (current < target) {
+                stat.textContent = Math.ceil(current).toLocaleString();
+                setTimeout(updateCount, stepTime);
+            } else {
+                stat.textContent = target.toLocaleString();
+            }
+        };
+        updateCount();
+    });
+
+    // 2. Create the charts
+    recreateCharts();
 });

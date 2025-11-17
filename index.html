@@ -16,7 +16,7 @@
 <body>
     <nav class="top-nav">
         <div class="logo"> <i class="fas fa-shield-virus"></i> <span>mAIware</span> </div>
-        <div class="nav-links"> <a href="#" class="nav-link" data-tooltip="Login"><i class="fas fa-sign-in-alt"></i><span class="link-text">Login</span></a> <a href="#" class="nav-link" data-tooltip="Sign Up"><i class="fas fa-user-plus"></i><span class="link-text">Sign Up</span></a> <a href="#" class="nav-link" data-tooltip="Community"><i class="fas fa-users"></i><span class="link-text">Community</span></a> <a href="#" class="nav-link" data-tooltip="API Docs"><i class="fas fa-code"></i><span class="link-text">API</span></a> <a href="#" id="history-btn" class="nav-link" data-tooltip="Scan History"><i class="fas fa-history"></i><span class="link-text">History</span></a> </div>
+        <div class="nav-links"> <a href="#" class="nav-link" data-tooltip="Login"><i class="fas fa-sign-in-alt"></i><span class="link-text">Login</span></a> <a href="#" class="nav-link" data-tooltip="Sign Up"><i class="fas fa-user-plus"></i><span class="link-text">Sign Up</span></a> <a href="#" class="nav-link" data-tooltip="Community"><i class="fas fa-users"></i><span class="link-text">Community</span></a> <a href="#" class="nav-link" data-tooltip="API Docs"><i class="fas fa-code"></i><span class="link-text">API</span></a> <a href="#" id="history-btn" class="nav-link" data-tooltip="Scan History"><i class="fas fa-history"></i><span class="link-text">History</span></a> <a href="#" class="nav-link" id="theme-toggle" data-tooltip="Toggle Theme"> <i class="fas fa-sun"></i> </a> </div>
     </nav>
 
     <main class="main-container">
@@ -207,5 +207,60 @@
     <script src="https://cdn.jsdelivr.net/npm/leader-line-new@1.1.9/leader-line.min.js"></script>
     <!-- Link to the JS file -->
     <script src="script.js"></script>
+
+    <script>
+    // Apply saved theme class immediately (before DOMContentLoaded)
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const themeToggleButton = document.getElementById('theme-toggle');
+        const body = document.body;
+        const themeIcon = themeToggleButton.querySelector('i');
+
+        // Set icon based on current theme
+        if (body.classList.contains('light-theme')) {
+            themeIcon.classList.remove('fa-sun');
+            themeIcon.classList.add('fa-moon');
+        }
+
+        // Function to apply the saved theme
+        const applyTheme = (theme) => {
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            } else {
+                body.classList.remove('light-theme');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            }
+            
+            // Recreate charts with updated theme colors
+            if (window.recreateCharts) {
+                window.recreateCharts();
+            }
+        };
+
+        // Add click event for the toggle button
+        themeToggleButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Stop the link from navigating
+            
+            // Check current theme
+            const isLightTheme = body.classList.contains('light-theme');
+            
+            // Set new theme
+            const newTheme = isLightTheme ? 'dark' : 'light';
+            
+            // Apply the new theme
+            applyTheme(newTheme);
+            
+            // Save the new theme to localStorage
+            localStorage.setItem('theme', newTheme);
+        });
+    });
+    </script>
 </body>
 </html>

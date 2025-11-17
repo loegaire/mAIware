@@ -1,6 +1,5 @@
 /* --- Global & Fonts --- */
 :root {
-    /* --- Dark Theme (Default) --- */
     --bg-dark-1: #121212;
     --bg-dark-2: #1e1e1e;
     --bg-dark-3: #2a2a2e;
@@ -9,53 +8,11 @@
     --text-light: #e0e0e0;
     --text-medium: #aaa;
     --text-dark: #888;
-    
-    /* --- Semantic Colors --- */
     --blue: #007bff;
     --red: #e74c3c;
     --yellow: #f1c40f;
     --green: #2ecc71;
-    
-    /* --- Syntax & Node Colors --- */
-    --syntax-op: #c39eff;
-    --syntax-string: #e6db74;
-    --syntax-const-text: #ffffff; /* Constant white for dark buttons/nodes */
-    --node-bg-entry: #254a25;
-    --node-bg-api: #2a3e4a;
-    --node-bg-suspicious: #4a452a;
-    --node-bg-malicious: #4a2a2a;
-
-    --chart-legend-text: var(--text-light);  /* #e0e0e0 */
-    --chart-axes-text: var(--text-medium);   /* #aaa */
-    --chart-grid-line: var(--border-color);
 }
-
-/* --- Light Theme --- */
-/* Add ".light-theme" to the <body> tag to activate */
-body.light-theme {
-    --bg-dark-1: #f8f9fa;     /* Main background */
-    --bg-dark-2: #ffffff;     /* Card background */
-    --bg-dark-3: #e9ecef;     /* Hover/active background */
-    --bg-dark-4: #ced4da;     /* Secondary button background */
-    --border-color: #dee2e6;  /* Border color */
-    --text-light: #212529;    /* Main text */
-    --text-medium: #6c757d;   /* Secondary text */
-    --text-dark: #888;        /* Tertiary text (can stay gray) */
-    
-    /* Semantic colors are unchanged */
-    /* --blue, --red, --yellow, --green */
-    
-    /* --- Light Theme Syntax --- */
-    --syntax-op: #a040ff;       /* Darker purple */
-    --syntax-string: #b8860b;     /* Dark goldenrod */
-    --syntax-const-text: #ffffff; /* Stays white for colored buttons/nodes */
-    
-    /* Node backgrounds are unchanged, they look good on a light BG */
-    --chart-legend-text: var(--text-medium); /* User Request */
-    --chart-axes-text: var(--text-medium);   /* User Request */
-    --chart-grid-line: var(--border-color);
-}
-
 
 /* Apply overflow-x to html as well */
 html {
@@ -540,12 +497,12 @@ body.is-showing-result .disassembly-wrapper {
 }
 .disassembly-line.active {
     background-color: var(--blue);
-    color: var(--syntax-const-text); /* MODIFIED */
+    color: #fff;
 }
 .disassembly-line .addr { color: var(--text-dark); margin-right: 1rem; }
-.disassembly-line .op { color: var(--syntax-op); font-weight: bold; width: 50px; display: inline-block; } /* MODIFIED */
+.disassembly-line .op { color: #c39eff; font-weight: bold; width: 50px; display: inline-block; }
 .disassembly-line .args { color: var(--text-light); }
-.disassembly-line .string { color: var(--syntax-string); } /* MODIFIED */
+.disassembly-line .string { color: #e6db74; }
 .disassembly-line .comment { color: var(--green); margin-left: 1rem; }
 
 
@@ -710,7 +667,7 @@ body.is-showing-result .file-internals-container {
 .entropy-bar-value {
     font-size: 0.8rem;
     font-weight: bold;
-    color: var(--syntax-const-text); /* MODIFIED */
+    color: #fff;
     text-shadow: 0 0 3px rgba(0,0,0,0.5);
 }
 /* Color coding for entropy bars */
@@ -754,7 +711,7 @@ body.is-showing-result .file-internals-container {
 .btn {
     flex-grow: 1; /* Make buttons fill space */
     background-color: var(--blue);
-    color: var(--syntax-const-text); /* MODIFIED */
+    color: #ffffff;
     border: none;
     padding: 12px 24px;
     border-radius: 6px;
@@ -1117,17 +1074,13 @@ body.is-showing-result .graph-wrapper {
     z-index: 2;
     text-align: center;
 }
-/* MODIFIED to use variables */
-.node-entry { background-color: var(--node-bg-entry); border-color: var(--green); color: var(--syntax-const-text); }
+.node-entry { background-color: #254a25; border-color: var(--green); color: #fff; }
 .node-std { background-color: var(--bg-dark-3); border-color: var(--border-color); color: var(--text-light); }
-.node-api { background-color: var(--node-bg-api); border-color: var(--blue); color: var(--syntax-const-text); }
-.node-suspicious { background-color: var(--node-bg-suspicious); border-color: var(--yellow); color: var(--syntax-const-text); }
-.node-malicious { background-color: var(--node-bg-malicious); border-color: var(--red); color: var(--syntax-const-text); }
+.node-api { background-color: #2a3e4a; border-color: var(--blue); color: #fff; }
+.node-suspicious { background-color: #4a452a; border-color: var(--yellow); color: #fff; }
+.node-malicious { background-color: #4a2a2a; border-color: var(--red); color: #fff; }
 
 .leader-line {
     z-index: 1; /* Sit behind nodes */
     opacity: 0.8;
-}
-body.light-theme .chart-container {
-    color: var(--text-medium);
 }
