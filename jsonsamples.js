@@ -53,11 +53,20 @@ const rawSamples = [
 /**
  * Builds a human-readable JSON report by mapping raw sample data.
  * @param {string} detectedFilename - The name of the file that was actually detected.
+ * @param {object} fileHashes - The file hashes (sha256, md5).
+ * @param {boolean} isPe - Whether the file is a PE file or not.
  * @returns {object} A final, human-readable JSON object.
  */
-function getRandomDemoJson(detectedFilename, fileHashes) {
-  // 1. Pick a random raw sample definition
-  const rawSample = rawSamples[Math.floor(Math.random() * rawSamples.length)];
+function getRandomDemoJson(detectedFilename, fileHashes, isPe = true) {
+  // For non-PE files, always return benign classification with non-PE file type
+  let rawSample;
+  if (!isPe) {
+    // Use the last benign sample (datasheet.pdf) which has no entropy (non-PE)
+    rawSample = rawSamples[7]; // datasheet.pdf - benign, non-PE (c: 0, f: 4 'PDF Document', e: [])
+  } else {
+    // 1. Pick a random raw sample definition (only from PE samples)
+    rawSample = rawSamples[Math.floor(Math.random() * rawSamples.length)];
+  }
   const classification = CLASSIFICATION[rawSample.c];
   
   // 2. Map API index to the actual list of names

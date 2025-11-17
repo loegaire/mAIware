@@ -13,6 +13,7 @@ const crypto = require('node:crypto')
 const axios = require('axios')
 const FormData = require('form-data')
 const { getRandomDemoJson } = require('./jsonsamples') //
+const { determinePeStatus } = require('./file-type-detector') //
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
 const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
@@ -138,7 +139,31 @@ async function handleSmallFile(filePath, detectedFilename) {
       postError(`[Hash] Failed to compute hashes for ${detectedFilename}: ${err.message}`)
     }
 
-    const scanResult = getRandomDemoJson(detectedFilename, fileHashes)
+    // Check if file is PE
+    let isPe = false
+    try {
+      const peStatus = await determinePeStatus(filePath)
+      isPe = !!peStatus.isPe
+      postLog(`[PE Detection] ${detectedFilename} is ${isPe ? 'a PE file' : 'not a PE file'}`)
+    } catch (err) {
+      // On error, treat as non-PE (safer default)
+      isPe = false
+      postLog(`[PE Detection] Failed for ${detectedFilename}: ${err.message}`)
+    }
+
+    // Build the proper result based on PE status
+    let scanResult
+    if (!isPe) {
+      scanResult = {
+        detected_filename: detectedFilename,
+        file_hashes: fileHashes || { sha256: '', md5: '' },
+        classification: 'Benign',
+        is_pe: false
+      }
+    } else {
+      scanResult = getRandomDemoJson(detectedFilename, fileHashes)
+      scanResult.is_pe = true
+    }
 
     postLog(`[Scan] Scan completed. (Triggered by ${detectedFilename})`)
     parentPort.postMessage({ channel: 'scan-result', payload: scanResult })
