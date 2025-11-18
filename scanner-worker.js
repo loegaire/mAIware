@@ -105,8 +105,19 @@ const getGatewayCandidates = () => {
   return ['1', '10', '20', '50', '100', '254'].map(last => `http://${prefix}.${last}:${SERVER_PORT}`)
 }
 
-// Discover servers via UDP broadcast
+// Discover servers via UDP broadcast with caching
+let broadcastCache = null
+let broadcastCacheExpiry = 0
+const BROADCAST_CACHE_TTL = 60000 // Cache broadcast results for 60 seconds
+
 const discoverServersViaBroadcast = () => {
+  // Return cached results if still valid
+  const now = Date.now()
+  if (broadcastCache && now < broadcastCacheExpiry) {
+    postLog(`[Broadcast] Using cached discovery (${Math.floor((broadcastCacheExpiry - now) / 1000)}s remaining)`)
+    return Promise.resolve(broadcastCache)
+  }
+
   return new Promise((resolve) => {
     const discovered = []
     const client = dgram.createSocket('udp4')
@@ -144,6 +155,9 @@ const discoverServersViaBroadcast = () => {
       // Wait 1.5 seconds for responses
       setTimeout(() => {
         client.close()
+        // Cache the results
+        broadcastCache = discovered
+        broadcastCacheExpiry = Date.now() + BROADCAST_CACHE_TTL
         resolve(discovered)
       }, 1500)
     })
