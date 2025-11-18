@@ -108,13 +108,13 @@ const getGatewayCandidates = () => {
 // Discover servers via UDP broadcast with caching
 let broadcastCache = null
 let broadcastCacheExpiry = 0
-const BROADCAST_CACHE_TTL = 60000 // Cache broadcast results for 60 seconds
+const BROADCAST_CACHE_TTL = 30000 // Cache successful broadcast results for 30 seconds
 
 const discoverServersViaBroadcast = () => {
-  // Return cached results if still valid
+  // Only return cached results if we found servers AND cache is still valid
   const now = Date.now()
-  if (broadcastCache && now < broadcastCacheExpiry) {
-    postLog(`[Broadcast] Using cached discovery (${Math.floor((broadcastCacheExpiry - now) / 1000)}s remaining)`)
+  if (broadcastCache && broadcastCache.length > 0 && now < broadcastCacheExpiry) {
+    postLog(`[Broadcast] Using cached discovery: ${broadcastCache.length} server(s) (${Math.floor((broadcastCacheExpiry - now) / 1000)}s remaining)`)
     return Promise.resolve(broadcastCache)
   }
 
@@ -155,9 +155,14 @@ const discoverServersViaBroadcast = () => {
       // Wait 1.5 seconds for responses
       setTimeout(() => {
         client.close()
-        // Cache the results
-        broadcastCache = discovered
-        broadcastCacheExpiry = Date.now() + BROADCAST_CACHE_TTL
+        // Only cache if we actually discovered servers
+        if (discovered.length > 0) {
+          broadcastCache = discovered
+          broadcastCacheExpiry = Date.now() + BROADCAST_CACHE_TTL
+          postLog(`[Broadcast] Discovered ${discovered.length} server(s), caching for ${BROADCAST_CACHE_TTL/1000}s`)
+        } else {
+          postLog('[Broadcast] No servers found via broadcast')
+        }
         resolve(discovered)
       }, 1500)
     })
