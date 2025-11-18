@@ -278,6 +278,9 @@ function renderPeResult(scanResult) {
   const apiList = scanResult.key_findings.api_imports || [];
   const graphData = generateGraphData(apiList, scanResult.classification);
   drawCallGraph(graphData);
+
+    // Generate QR for PE report
+    generatePeQr(scanResult);
 }
 
 function renderNonPeResult(scanResult) {
@@ -304,6 +307,9 @@ function renderNonPeResult(scanResult) {
   currentGraphLines = [];
   entropyBarsContainer.innerHTML = '';
   keyStringsContainer.innerHTML = '';
+
+    // Hide QR for non-PE
+    clearQr();
 }
 
 /**
@@ -355,6 +361,45 @@ function clearResultData() {
     callGraphEl.innerHTML = '';
     currentGraphLines.forEach(line => line.remove());
     currentGraphLines = [];
+}
+
+// --- QR helpers ---
+function clearQr() {
+    const qrSection = document.getElementById('qr-section');
+    const qrEl = document.getElementById('qr-code');
+    if (qrEl) qrEl.innerHTML = '';
+    if (qrSection) qrSection.style.display = 'none';
+}
+
+function generatePeQr(scanResult) {
+    const qrSection = document.getElementById('qr-section');
+    const qrEl = document.getElementById('qr-code');
+    if (!qrEl || !qrSection || typeof QRCode === 'undefined') return;
+
+    // Build a compact JSON report that fits in a QR
+    const report = {
+        filename: scanResult.detected_filename,
+        classification: scanResult.classification,
+        confidence: Number(scanResult.confidence_score),
+        family: scanResult.malware_family || null,
+        vendor: (scanResult.vendor && scanResult.vendor.name) ? scanResult.vendor.name : null,
+        hashes: {
+            sha256: scanResult.file_hashes?.sha256 || null,
+            md5: scanResult.file_hashes?.md5 || null
+        },
+        ts: Date.now()
+    };
+
+    // Show section and render
+    qrSection.style.display = 'block';
+    qrEl.innerHTML = '';
+    const json = JSON.stringify(report);
+    try {
+        new QRCode(qrEl, { text: json, width: 160, height: 160, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.M });
+    } catch (e) {
+        console.warn('QR generation failed', e);
+        qrEl.textContent = 'QR unavailable';
+    }
 }
 
 // --- VENDOR UI FUNCTION (IMPLEMENTED) ---

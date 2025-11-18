@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Chart.js for stats (which you already had) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- QRCode.js for QR generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- Link to the CSS file -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -124,6 +126,12 @@
                 <div class="details-section">
                     <h4>System IP</h4>
                     <p class="hash-text" id="details-system-ip">Detecting...</p>
+                </div>
+
+                <!-- QR Code for PE results -->
+                <div class="details-section qr-section" id="qr-section" style="display:none;">
+                    <h4>Scan Report QR</h4>
+                    <div id="qr-code" class="qr-code-wrapper"></div>
                 </div>
 
                 <div class="details-section">
