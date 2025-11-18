@@ -106,6 +106,12 @@ let lastScanResult = null;
 window.electronAPI.onScanStarted((filename) => {
   console.log(`UI: Received scan-started for ${filename}`);
 
+    // If user is viewing a result, don't auto-switch to analyzing.
+    if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
+        console.log('UI: Result is being viewed; deferring analyzing UI switch');
+        return;
+    }
+
   // 1. Set UI to "Analyzing" state
   initialState.classList.remove('active'); //
   analyzingState.classList.add('active'); //
@@ -138,20 +144,25 @@ window.electronAPI.onScanResult((scanResult) => {
   clearInterval(disassemblyInterval); //
   disassemblyInterval = null; //
 
-  bodyEl.classList.remove('is-analyzing'); //
-  bodyEl.classList.add('is-showing-result'); //
-
-  analyzingState.classList.remove('active'); //
-  resultState.classList.add('active'); //
-
   // Add to history
   scanHistory.push(scanResult);
   currentHistoryIndex = scanHistory.length - 1;
-  
-  lastScanResult = scanResult;
 
-  renderScanResult();
-  updateNavigationButtons();
+    // If a result is already being viewed, do not auto-advance UI.
+    if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
+        updateNavigationButtons();
+        return;
+    }
+
+    bodyEl.classList.remove('is-analyzing'); //
+    bodyEl.classList.add('is-showing-result'); //
+
+    analyzingState.classList.remove('active'); //
+    resultState.classList.add('active'); //
+
+    lastScanResult = scanResult;
+    renderScanResult();
+    updateNavigationButtons();
 });
 
 window.electronAPI.onScanFileMetadata((metadata) => {
