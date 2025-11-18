@@ -18,12 +18,11 @@ const { determinePeStatus } = require('./file-type-detector') //
 const { getPrimaryIPv4 } = require('./system-info')
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
-const SERVER_HOST = process.env.MAIWARE_SERVER_HOST || 'localhost'
-const SERVER_PORT = process.env.MAIWARE_SERVER_PORT || '3000'
-const SERVER_BASE_URL = process.env.MAIWARE_SERVER_URL || `http://${SERVER_HOST}:${SERVER_PORT}`
-const SERVER_ENDPOINT = `${SERVER_BASE_URL.replace(/\/$/, '')}/api/submit-scan`
 const AGENT_ID = process.env.MAIWARE_AGENT_ID || os.hostname()
 const AGENT_IP = process.env.MAIWARE_AGENT_IP || getPrimaryIPv4()
+const SERVER_PORT = process.env.MAIWARE_SERVER_PORT || '3000'
+const LAST_KNOWN_PATH = path.join(os.homedir(), '.maiware-server.json')
+let resolvedServerBaseUrl = null
 const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
 const DEFAULT_SCAN_DELAY_MS = 10000
 
@@ -52,6 +51,90 @@ function postLog(message) {
 
 function postError(message) {
   parentPort.postMessage({ channel: 'error', payload: message })
+}
+
+// --- Server resolution helpers (plug-n-play: try local then LAN) ---
+const readLastKnownServer = () => {
+  try {
+    const raw = fs.readFileSync(LAST_KNOWN_PATH, 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.baseUrl === 'string') {
+      return parsed.baseUrl
+    }
+  } catch (_) {
+    // ignore
+  }
+  return null
+}
+
+const writeLastKnownServer = (baseUrl) => {
+  try {
+    fs.writeFileSync(LAST_KNOWN_PATH, JSON.stringify({ baseUrl }), 'utf8')
+  } catch (_) {
+    // non-fatal
+  }
+}
+
+const stripTrailingSlash = (url) => url.endsWith('/') ? url.slice(0, -1) : url
+
+const probeServer = async (baseUrl) => {
+  const target = `${stripTrailingSlash(baseUrl)}/api/health`
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 2000)
+    const res = await fetch(target, { signal: controller.signal })
+    clearTimeout(timeout)
+    return res.ok
+  } catch (_) {
+    return false
+  }
+}
+
+const unique = (list) => Array.from(new Set(list.filter(Boolean)))
+
+const getGatewayCandidates = () => {
+  const ip = getPrimaryIPv4()
+  if (!ip) return []
+  const parts = ip.split('.')
+  if (parts.length !== 4) return []
+  const prefix = parts.slice(0, 3).join('.')
+  // lightweight probes for common addresses on /24
+  return ['1', '10', '20', '50', '100'].map(last => `http://${prefix}.${last}:${SERVER_PORT}`)
+}
+
+async function resolveServerBaseUrl() {
+  if (resolvedServerBaseUrl) {
+    return resolvedServerBaseUrl
+  }
+
+  const envUrl = process.env.MAIWARE_SERVER_URL
+  const envHost = process.env.MAIWARE_SERVER_HOST
+
+  const candidates = unique([
+    readLastKnownServer(),
+    envUrl,
+    envHost ? `http://${envHost}:${SERVER_PORT}` : null,
+    `http://localhost:${SERVER_PORT}`,
+    `http://127.0.0.1:${SERVER_PORT}`,
+    `http://${os.hostname()}:${SERVER_PORT}`,
+    'http://host.docker.internal:3000',
+    ...getGatewayCandidates()
+  ])
+
+  for (const base of candidates) {
+    const ok = await probeServer(base)
+    if (ok) {
+      resolvedServerBaseUrl = stripTrailingSlash(base)
+      writeLastKnownServer(resolvedServerBaseUrl)
+      postLog(`[Server] Selected endpoint ${resolvedServerBaseUrl}`)
+      return resolvedServerBaseUrl
+    }
+  }
+
+  // Fall back to localhost even if probe failed (best effort)
+  resolvedServerBaseUrl = `http://localhost:${SERVER_PORT}`
+  postLog(`[Server] Falling back to ${resolvedServerBaseUrl}`)
+  return resolvedServerBaseUrl
 }
 
 async function waitForIdle(timeoutMs = 15000) {
@@ -96,6 +179,8 @@ async function processQueue() {
 }
 
 async function sendResultToServer(scanResult) {
+  const baseUrl = await resolveServerBaseUrl()
+  const endpoint = `${baseUrl}/api/submit-scan`
   const payload = {
     ...scanResult,
     agent_id: AGENT_ID,
@@ -106,8 +191,8 @@ async function sendResultToServer(scanResult) {
   }
 
   try {
-    postLog(`[Server] Uploading scan to ${SERVER_ENDPOINT} as ${payload.agent_id}`)
-    const response = await fetch(SERVER_ENDPOINT, {
+    postLog(`[Server] Uploading scan to ${endpoint} as ${payload.agent_id}`)
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -120,6 +205,8 @@ async function sendResultToServer(scanResult) {
     }
   } catch (error) {
     postLog(`[Server] Failed to upload: ${error.message}`)
+    // force re-resolve next time in case server moved
+    resolvedServerBaseUrl = null
   }
 }
 
