@@ -6,6 +6,7 @@ try {
 } catch (err) {
   // Fallback to fs.watch when chokidar is unavailable
 }
+const os = require('node:os')
 const path = require('node:path')
 const fs = require('node:fs')
 const fsPromises = require('node:fs').promises
@@ -14,8 +15,15 @@ const axios = require('axios')
 const FormData = require('form-data')
 const { getRandomDemoJson } = require('./jsonsamples') //
 const { determinePeStatus } = require('./file-type-detector') //
+const { getPrimaryIPv4 } = require('./system-info')
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
+const SERVER_HOST = process.env.MAIWARE_SERVER_HOST || 'localhost'
+const SERVER_PORT = process.env.MAIWARE_SERVER_PORT || '3000'
+const SERVER_BASE_URL = process.env.MAIWARE_SERVER_URL || `http://${SERVER_HOST}:${SERVER_PORT}`
+const SERVER_ENDPOINT = `${SERVER_BASE_URL.replace(/\/$/, '')}/api/submit-scan`
+const AGENT_ID = process.env.MAIWARE_AGENT_ID || os.hostname()
+const AGENT_IP = process.env.MAIWARE_AGENT_IP || getPrimaryIPv4()
 const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
 const DEFAULT_SCAN_DELAY_MS = 10000
 
@@ -88,22 +96,30 @@ async function processQueue() {
 }
 
 async function sendResultToServer(scanResult) {
-  const SERVER_URL = 'http://localhost:3000/api/submit-scan';
-  
+  const payload = {
+    ...scanResult,
+    agent_id: AGENT_ID,
+    systemInfo: {
+      hostname: os.hostname(),
+      ip: AGENT_IP
+    }
+  }
+
   try {
-    const response = await fetch(SERVER_URL, {
+    postLog(`[Server] Uploading scan to ${SERVER_ENDPOINT} as ${payload.agent_id}`)
+    const response = await fetch(SERVER_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(scanResult)
-    });
-    
+      body: JSON.stringify(payload)
+    })
+
     if (response.ok) {
-      postLog('[Server] Scan result uploaded successfully');
+      postLog('[Server] Scan result uploaded successfully')
     } else {
-      postLog(`[Server] Upload failed: ${response.statusText}`);
+      postLog(`[Server] Upload failed: ${response.statusText}`)
     }
   } catch (error) {
-    postLog(`[Server] Failed to upload: ${error.message}`);
+    postLog(`[Server] Failed to upload: ${error.message}`)
   }
 }
 
