@@ -678,6 +678,27 @@ body.is-showing-result .analysis-details-container {
     word-break: break-all;
 }
 
+/* --- QR Code Section --- */
+.qr-section {
+    display: none; /* toggled on for PE */
+    align-items: center;
+}
+.qr-code-wrapper {
+    display: inline-flex;
+    padding: 0.5rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.qr-code-wrapper canvas,
+.qr-code-wrapper img {
+    width: 160px;
+    height: 160px;
+}
+body.light-theme .qr-code-wrapper {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
 /* --- Vendor & Signature --- */
 .details-grid {
     display: grid;
