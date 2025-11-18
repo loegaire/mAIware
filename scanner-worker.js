@@ -13,6 +13,7 @@ const fsPromises = require('node:fs').promises
 const crypto = require('node:crypto')
 const axios = require('axios')
 const FormData = require('form-data')
+const dgram = require('node:dgram')
 const { getRandomDemoJson } = require('./jsonsamples') //
 const { determinePeStatus } = require('./file-type-detector') //
 const { getPrimaryIPv4 } = require('./system-info')
@@ -21,6 +22,8 @@ const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
 const AGENT_ID = process.env.MAIWARE_AGENT_ID || os.hostname()
 const AGENT_IP = process.env.MAIWARE_AGENT_IP || getPrimaryIPv4()
 const SERVER_PORT = process.env.MAIWARE_SERVER_PORT || '3000'
+const BROADCAST_PORT = 3001
+const DISCOVERY_MESSAGE = 'MAIWARE_SERVER_DISCOVERY'
 const LAST_KNOWN_PATH = path.join(os.homedir(), '.maiware-server.json')
 let resolvedServerBaseUrl = null
 const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
@@ -99,7 +102,52 @@ const getGatewayCandidates = () => {
   if (parts.length !== 4) return []
   const prefix = parts.slice(0, 3).join('.')
   // lightweight probes for common addresses on /24
-  return ['1', '10', '20', '50', '100'].map(last => `http://${prefix}.${last}:${SERVER_PORT}`)
+  return ['1', '10', '20', '50', '100', '254'].map(last => `http://${prefix}.${last}:${SERVER_PORT}`)
+}
+
+// Discover servers via UDP broadcast
+const discoverServersViaBroadcast = () => {
+  return new Promise((resolve) => {
+    const discovered = []
+    const client = dgram.createSocket('udp4')
+    
+    client.on('message', (msg, rinfo) => {
+      try {
+        const data = JSON.parse(msg.toString())
+        if (data.service === 'mAIware-server' && data.port && data.ips) {
+          for (const ip of data.ips) {
+            discovered.push(`http://${ip}:${data.port}`)
+          }
+        }
+      } catch (_) {
+        // Ignore malformed responses
+      }
+    })
+    
+    client.on('error', () => {
+      // Ignore errors, just return what we found
+    })
+    
+    // Bind to any port
+    client.bind(() => {
+      client.setBroadcast(true)
+      
+      // Send broadcast discovery message
+      const message = Buffer.from(DISCOVERY_MESSAGE)
+      client.send(message, BROADCAST_PORT, '255.255.255.255', (err) => {
+        if (err) {
+          client.close()
+          resolve([])
+        }
+      })
+      
+      // Wait 1.5 seconds for responses
+      setTimeout(() => {
+        client.close()
+        resolve(discovered)
+      }, 1500)
+    })
+  })
 }
 
 async function resolveServerBaseUrl() {
@@ -110,8 +158,34 @@ async function resolveServerBaseUrl() {
   const envUrl = process.env.MAIWARE_SERVER_URL
   const envHost = process.env.MAIWARE_SERVER_HOST
 
+  // Priority 1: Try last known working server first (fast path)
+  const lastKnown = readLastKnownServer()
+  if (lastKnown) {
+    const ok = await probeServer(lastKnown)
+    if (ok) {
+      resolvedServerBaseUrl = stripTrailingSlash(lastKnown)
+      postLog(`[Server] Reconnected to last known: ${resolvedServerBaseUrl}`)
+      return resolvedServerBaseUrl
+    }
+  }
+
+  // Priority 2: UDP broadcast discovery (finds servers on LAN automatically)
+  postLog('[Server] Broadcasting for mAIware servers on LAN...')
+  const broadcastResults = await discoverServersViaBroadcast()
+  if (broadcastResults.length > 0) {
+    for (const base of broadcastResults) {
+      const ok = await probeServer(base)
+      if (ok) {
+        resolvedServerBaseUrl = stripTrailingSlash(base)
+        writeLastKnownServer(resolvedServerBaseUrl)
+        postLog(`[Server] Discovered via broadcast: ${resolvedServerBaseUrl}`)
+        return resolvedServerBaseUrl
+      }
+    }
+  }
+
+  // Priority 3: Try explicit configuration and common local addresses
   const candidates = unique([
-    readLastKnownServer(),
     envUrl,
     envHost ? `http://${envHost}:${SERVER_PORT}` : null,
     `http://localhost:${SERVER_PORT}`,
@@ -121,6 +195,7 @@ async function resolveServerBaseUrl() {
     ...getGatewayCandidates()
   ])
 
+  postLog(`[Server] Probing ${candidates.length} candidate endpoints...`)
   for (const base of candidates) {
     const ok = await probeServer(base)
     if (ok) {
@@ -178,9 +253,7 @@ async function processQueue() {
   }
 }
 
-async function sendResultToServer(scanResult) {
-  const baseUrl = await resolveServerBaseUrl()
-  const endpoint = `${baseUrl}/api/submit-scan`
+async function sendResultToServer(scanResult, retries = 3) {
   const payload = {
     ...scanResult,
     agent_id: AGENT_ID,
@@ -190,24 +263,50 @@ async function sendResultToServer(scanResult) {
     }
   }
 
-  try {
-    postLog(`[Server] Uploading scan to ${endpoint} as ${payload.agent_id}`)
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const baseUrl = await resolveServerBaseUrl()
+      const endpoint = `${baseUrl}/api/submit-scan`
+      
+      postLog(`[Server] Uploading scan to ${endpoint} as ${payload.agent_id} (attempt ${attempt + 1}/${retries})`)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeout)
 
-    if (response.ok) {
-      postLog('[Server] Scan result uploaded successfully')
-    } else {
-      postLog(`[Server] Upload failed: ${response.statusText}`)
+      if (response.ok) {
+        postLog('[Server] Scan result uploaded successfully')
+        return // Success!
+      } else {
+        postLog(`[Server] Upload failed: ${response.status} ${response.statusText}`)
+        if (response.status >= 400 && response.status < 500) {
+          // Client error, don't retry
+          return
+        }
+      }
+    } catch (error) {
+      postLog(`[Server] Failed to upload: ${error.message}`)
+      
+      // Force re-resolve on next attempt in case server moved
+      resolvedServerBaseUrl = null
+      
+      // Exponential backoff: wait 1s, 2s, 4s
+      if (attempt < retries - 1) {
+        const backoffMs = Math.pow(2, attempt) * 1000
+        postLog(`[Server] Retrying in ${backoffMs}ms...`)
+        await delay(backoffMs)
+      }
     }
-  } catch (error) {
-    postLog(`[Server] Failed to upload: ${error.message}`)
-    // force re-resolve next time in case server moved
-    resolvedServerBaseUrl = null
   }
+  
+  postLog('[Server] All upload attempts failed. Scan result will be lost.')
 }
 
 async function handleSmallFile(filePath, detectedFilename) {
