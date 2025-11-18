@@ -25,6 +25,18 @@
             <!-- Main Scanner Box -->
             <div class="scanner-container">
                 <h1>AI Malware Detection</h1>
+                
+                <!-- Navigation Controls (Top Position) -->
+                <div class="scan-navigation scan-navigation-top">
+                    <button id="prev-scan-btn" class="nav-btn" disabled>
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="nav-info" class="nav-info">1 of 1</span>
+                    <button id="next-scan-btn" class="nav-btn" disabled>
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                
                 <!-- State 1: Initial -->
                 <div id="initial-state" class="scanner-state active">
                     <p>Watching your Downloads folder for new files...</p>

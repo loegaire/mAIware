@@ -35,6 +35,10 @@ const mockDisassemblyMalware = [
 // const mockGraphSuspicious = ... (DELETED)
 // const mockGraphMalware = ... (DELETED)
 
+// --- NAVIGATION STATE ---
+let scanHistory = [];
+let currentHistoryIndex = -1;
+
 // --- ELEMENT REFERENCES ---
 const initialState = document.getElementById('initial-state');
 const analyzingState = document.getElementById('analyzing-state');
@@ -140,9 +144,14 @@ window.electronAPI.onScanResult((scanResult) => {
   analyzingState.classList.remove('active'); //
   resultState.classList.add('active'); //
 
+  // Add to history
+  scanHistory.push(scanResult);
+  currentHistoryIndex = scanHistory.length - 1;
+  
   lastScanResult = scanResult;
 
   renderScanResult();
+  updateNavigationButtons();
 });
 
 window.electronAPI.onScanFileMetadata((metadata) => {
@@ -848,6 +857,55 @@ window.recreateCharts = function() {
     }
 };
 
+// --- NAVIGATION FUNCTIONS ---
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prev-scan-btn');
+    const nextBtn = document.getElementById('next-scan-btn');
+    const navInfo = document.getElementById('nav-info');
+    
+    if (!prevBtn || !nextBtn) return;
+    
+    // Disable/enable buttons based on position
+    prevBtn.disabled = currentHistoryIndex <= 0;
+    nextBtn.disabled = currentHistoryIndex >= scanHistory.length - 1;
+    
+    // Update info text
+    if (navInfo && scanHistory.length > 0) {
+        navInfo.textContent = `${currentHistoryIndex + 1} of ${scanHistory.length}`;
+    }
+}
+
+function showPreviousScan() {
+    if (currentHistoryIndex > 0) {
+        currentHistoryIndex--;
+        lastScanResult = scanHistory[currentHistoryIndex];
+        renderScanResult();
+        updateNavigationButtons();
+    }
+}
+
+function showNextScan() {
+    if (currentHistoryIndex < scanHistory.length - 1) {
+        currentHistoryIndex++;
+        lastScanResult = scanHistory[currentHistoryIndex];
+        renderScanResult();
+        updateNavigationButtons();
+    }
+}
+
+// Initialize history from electron-store on load
+async function initializeScanHistory() {
+    try {
+        const storedHistory = await window.electronAPI.getHistory();
+        if (storedHistory && Array.isArray(storedHistory)) {
+            scanHistory = storedHistory;
+            currentHistoryIndex = scanHistory.length - 1;
+        }
+    } catch (error) {
+        console.error('Failed to load scan history:', error);
+    }
+}
+
 // --- Run on Page Load ---
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Animate Stat Cards
@@ -874,4 +932,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Create the charts
     recreateCharts();
+    
+    // 3. Initialize scan history
+    initializeScanHistory();
+    
+    // 4. Setup navigation button handlers
+    const prevBtn = document.getElementById('prev-scan-btn');
+    const nextBtn = document.getElementById('next-scan-btn');
+    
+    if (prevBtn) prevBtn.addEventListener('click', showPreviousScan);
+    if (nextBtn) nextBtn.addEventListener('click', showNextScan);
 });
