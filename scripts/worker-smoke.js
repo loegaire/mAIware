@@ -67,7 +67,11 @@ worker.on('message', (message) => {
       console.error(payload)
       break
     case 'scan-started':
-      console.log(`[Smoke] Scan started for: ${payload}`)
+      if (typeof payload === 'object' && payload !== null) {
+        console.log(`[Smoke] Scan started for: ${payload.filename || payload.fullPath || '[unknown]'}`)
+      } else {
+        console.log(`[Smoke] Scan started for: ${payload}`)
+      }
       break
     case 'scan-result':
       console.log('[Smoke] Scan result:')

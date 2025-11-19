@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain } = require('electron/main')
+const { app, BrowserWindow, dialog, ipcMain } = require('electron/main')
 const path = require('node:path')
-const { startMonitorWorker, attachWindow } = require('./monitor-runtime') //
-const { onMonitorEvent } = require('./monitor-runtime')
+const fs = require('node:fs')
+const fsPromises = fs.promises
+const { attachWindow, onMonitorEvent, requestManualScan, startMonitorWorker } = require('./monitor-runtime') //
 const { determinePeStatus } = require('./file-type-detector')
 const { getPrimaryIPv4 } = require('./system-info')
 const Store = require('electron-store')
@@ -124,13 +125,40 @@ const dispatchMetadataUpdate = (filename, metadata) => {
   }
 }
 
-const inspectFileForPe = async (filename) => {
-  const downloadsPath = getDownloadsPath()
-  if (!downloadsPath || !filename) {
+const inspectFileForPe = async (payload) => {
+  if (!payload) {
     return
   }
 
-  const fullPath = path.join(downloadsPath, filename)
+  let filename = ''
+  let fullPath = null
+
+  if (typeof payload === 'string') {
+    filename = payload
+  } else if (typeof payload === 'object') {
+    if (typeof payload.filename === 'string') {
+      filename = payload.filename
+    } else if (typeof payload.payload === 'string') {
+      filename = payload.payload
+    }
+
+    if (typeof payload.fullPath === 'string') {
+      fullPath = payload.fullPath
+    }
+  }
+
+  if (!filename) {
+    return
+  }
+
+  if (!fullPath) {
+    const downloadsPath = getDownloadsPath()
+    if (!downloadsPath) {
+      return
+    }
+
+    fullPath = path.join(downloadsPath, filename)
+  }
 
   try {
     const status = await determinePeStatus(fullPath)
@@ -223,6 +251,45 @@ ipcMain.handle('history:get', async () => { // <-- ADD THIS BLOCK
 })
 ipcMain.handle('system-info:get-ip', async () => {
   return getPrimaryIPv4()
+})
+ipcMain.handle('scan:manual:pick-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile']
+    })
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { canceled: true }
+    }
+
+    return { canceled: false, filePath: result.filePaths[0] }
+  } catch (err) {
+    return { canceled: true, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+ipcMain.handle('scan:manual', async (_event, targetPath) => {
+  if (typeof targetPath !== 'string' || targetPath.trim().length === 0) {
+    return { ok: false, error: 'Select a file to scan.' }
+  }
+
+  const resolvedPath = path.resolve(targetPath.trim())
+
+  try {
+    await fsPromises.access(resolvedPath, fs.constants.R_OK)
+    const stats = await fsPromises.stat(resolvedPath)
+    if (!stats.isFile()) {
+      return { ok: false, error: 'Please choose a file, not a folder.' }
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+
+  try {
+    requestManualScan(resolvedPath)
+    return { ok: true, path: resolvedPath }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 })
 
 app.whenReady().then(() => {

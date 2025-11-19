@@ -25,6 +25,22 @@ npm start
 
 If nothing happens, double‑check that the file really landed in the Downloads folder being monitored and that the Electron app remained open.
 
+### Manually scanning files
+
+You can now trigger a scan without moving the file into Downloads:
+
+1. Click **Scan a File Manually** on the idle screen.
+2. Pick any readable file and the worker will enqueue it immediately. The UI reuses the same "Analyzing" and "Result" flows so you can compare automatic and manual submissions side by side.
+
+If you're automating things (or running headless), you can invoke the same code path yourself:
+
+```js
+// Renderer process
+ipcRenderer.invoke('scan:manual', '/absolute/path/to/file.exe')
+```
+
+The handler validates that the file exists and is readable before telling the worker to process it.
+
 ## Running in background/headless mode
 You can start the monitor without creating any window. The worker thread keeps running and logs progress to the terminal:
 
