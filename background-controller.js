@@ -18,7 +18,7 @@ function setupBackgroundController({ app, createWindow, isBackgroundOnly }) {
   let mainWindow = null
   let isQuitting = false
 
-  const iconPath = path.join(__dirname, 'assets', 'icon.png')
+  const iconPath = path.join(__dirname, 'assets', 'logohust.jpg')
   let trayIcon = iconPath
 
   try {
