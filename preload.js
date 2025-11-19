@@ -13,5 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onScanFileMetadata: (callback) => ipcRenderer.on('scan-file-metadata', (_event, metadata) => callback(metadata)),
 
   getSystemIp: () => ipcRenderer.invoke('system-info:get-ip'),
-  getHistory: () => ipcRenderer.invoke('history:get')
+  getHistory: () => ipcRenderer.invoke('history:get'),
+  pickManualScanFile: () => ipcRenderer.invoke('scan:manual:pick-file'),
+  scanManualFile: (filePath) => ipcRenderer.invoke('scan:manual', filePath)
 })

@@ -399,11 +399,18 @@ async function handleSmallFile(filePath, detectedFilename) {
   ])
 }
 
-function handleDetectedFile(filePath) {
+function handleDetectedFile(filePath, options = {}) {
   const detectedFilename = path.basename(filePath)
   postLog(`[Monitor] Detected new file: ${detectedFilename}`)
 
-  parentPort.postMessage({ channel: 'scan-started', payload: detectedFilename })
+  parentPort.postMessage({
+    channel: 'scan-started',
+    payload: {
+      filename: detectedFilename,
+      fullPath: filePath,
+      manual: !!options.manual
+    }
+  })
 
   fileQueue.push(filePath)
   processQueue()
@@ -473,9 +480,8 @@ async function closeWatcher() {
 
 function queueManualScan(filePath) {
   const normalized = path.resolve(filePath)
-  fileQueue.push(normalized)
   postLog(`[Monitor] Manually queued file: ${normalized}`)
-  processQueue()
+  handleDetectedFile(normalized, { manual: true })
 }
 
 function computeFileHashes(filePath) {

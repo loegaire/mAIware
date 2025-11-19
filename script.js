@@ -53,6 +53,8 @@ const nonPeResultWrapper = document.getElementById('non-pe-result');
 const nonPeFilename = document.getElementById('non-pe-filename');
 const nonPeHashSha256 = document.getElementById('non-pe-hash-sha256');
 const nonPeHashMd5 = document.getElementById('non-pe-hash-md5');
+const manualScanBtn = document.getElementById('manual-scan-btn');
+const manualScanError = document.getElementById('manual-scan-error');
 
 const bodyEl = document.body;
 let animationWrapper = null;
@@ -102,9 +104,64 @@ let currentGraphLines = []; // Renamed from currentLines to avoid conflict
 let currentFileMetadata = null;
 let lastScanResult = null;
 
+function resolveScanStartedFilename(payload) {
+  if (typeof payload === 'string') {
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    if (typeof payload.filename === 'string' && payload.filename.length > 0) {
+      return payload.filename;
+    }
+
+    if (typeof payload.fullPath === 'string') {
+      const pathSegments = payload.fullPath.split(/[\\/]/);
+      return pathSegments[pathSegments.length - 1] || payload.fullPath;
+    }
+  }
+
+  return 'Unknown file';
+}
+
+function showManualScanError(message = '') {
+  if (!manualScanError) {
+    return;
+  }
+
+  manualScanError.textContent = message;
+}
+
+if (manualScanBtn) {
+  manualScanBtn.addEventListener('click', async (event) => {
+    event.preventDefault();
+    showManualScanError('');
+    manualScanBtn.disabled = true;
+
+    try {
+      const selection = await window.electronAPI.pickManualScanFile();
+      if (!selection || selection.canceled || !selection.filePath) {
+        return;
+      }
+
+      const response = await window.electronAPI.scanManualFile(selection.filePath);
+      if (!response || !response.ok) {
+        throw new Error(response && response.error ? response.error : 'Unable to start scan.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start manual scan.';
+      showManualScanError(message);
+    } finally {
+      manualScanBtn.disabled = false;
+    }
+  });
+}
+
 // 1. Listen for the 'scan-started' message from the backend
-window.electronAPI.onScanStarted((filename) => {
+window.electronAPI.onScanStarted((payload) => {
+  const filename = resolveScanStartedFilename(payload);
   console.log(`UI: Received scan-started for ${filename}`);
+
+    showManualScanError('');
 
     // If user is viewing a result, don't auto-switch to analyzing.
     if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {

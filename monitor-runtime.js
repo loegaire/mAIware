@@ -26,7 +26,10 @@ function notifyListeners(channel, payload) {
   if (attachedWindow && !attachedWindow.isDestroyed()) {
     attachedWindow.webContents.send(channel, payload)
   } else if (channel === 'scan-started') {
-    console.log(`[Monitor] Headless scan started for: ${payload}`)
+    const startedFile = typeof payload === 'object' && payload !== null
+      ? payload.filename || payload.fullPath || '[unknown]'
+      : payload
+    console.log(`[Monitor] Headless scan started for: ${startedFile}`)
   } else if (channel === 'scan-result') {
     console.log('[Monitor] Headless scan result:', JSON.stringify(payload, null, 2))
   } else if (channel === 'ready') {
@@ -109,6 +112,15 @@ function startMonitorWorker(win) {
   return ensureWorker()
 }
 
+function requestManualScan(filePath) {
+  if (!filePath) {
+    return
+  }
+
+  const worker = ensureWorker()
+  worker.postMessage({ type: 'scan-path', path: filePath })
+}
+
 function stopMonitorWorker() {
   if (!monitorWorker) {
     return
@@ -122,6 +134,7 @@ module.exports = {
   attachWindow,
   onMonitorEvent,
   startMonitorWorker,
+  requestManualScan,
   stopMonitorWorker,
 }
 

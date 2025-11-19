@@ -296,6 +296,29 @@ h1 {
     color: var(--text-dark);
 }
 
+.manual-upload {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.manual-upload .btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.manual-scan-hint {
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    margin: 0.75rem 0 0;
+}
+
+.manual-error {
+    color: var(--red);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    min-height: 1.2rem;
+}
+
 /* --- State 2: Analyzing --- */
 .analyzing-icon .loader {
     width: 80px;
