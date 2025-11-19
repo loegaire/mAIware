@@ -85,6 +85,9 @@ const historyCloseBtn = document.getElementById('history-close-btn');
 const historyOverlay = document.getElementById('history-overlay');
 const historyListEl = document.querySelector('.history-list');
 
+// Home button element
+const homeBtn = document.getElementById('home-btn');
+
 // Scroll Zone elements
 const scrollZoneTop = document.getElementById('scroll-zone-top');
 const scrollZoneBottom = document.getElementById('scroll-zone-bottom');
@@ -559,6 +562,35 @@ function removeAnimationClasses() {
     bodyEl.classList.remove('result-malware-active');
 }
 
+// --- Reset to Initial State Function ---
+function resetToInitialState() {
+    // Clear any running intervals
+    if (disassemblyInterval) {
+        clearInterval(disassemblyInterval);
+        disassemblyInterval = null;
+    }
+    
+    // Remove all state classes from body
+    bodyEl.classList.remove('is-analyzing');
+    bodyEl.classList.remove('is-showing-result');
+    bodyEl.classList.remove('is-non-pe');
+    removeAnimationClasses();
+    
+    // Hide all states except initial
+    initialState.classList.add('active');
+    analyzingState.classList.remove('active');
+    resultState.classList.remove('active');
+    nonPeResultWrapper.classList.remove('active');
+    
+    // Clear any error messages
+    if (manualScanError) {
+        manualScanError.textContent = '';
+    }
+    
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 // --- Disassembly Functions ---
 
 function populateDisassembly(codeLines) {
@@ -811,6 +843,12 @@ function toggleHistoryPanel() {
     loadHistory();
   }
 }
+
+// Home button event listener
+homeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    resetToInitialState();
+});
 
 historyBtn.addEventListener('click', (e) => {
     e.preventDefault();
