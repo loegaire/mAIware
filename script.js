@@ -78,6 +78,22 @@ const fileInternalsWrapper = document.getElementById('file-internals-wrapper');
 const entropyBarsContainer = document.getElementById('entropy-bars-container');
 const keyStringsContainer = document.getElementById('key-strings-container');
 
+// AI Voting elements
+const aiVotingSection = document.getElementById('ai-voting-section');
+const voteBarBenign = document.getElementById('vote-bar-benign');
+const voteBarMalware = document.getElementById('vote-bar-malware');
+const voteCountBenign = document.getElementById('vote-count-benign');
+const voteCountMalware = document.getElementById('vote-count-malware');
+
+// PE Metadata elements
+const peMetadataSection = document.getElementById('pe-metadata-section');
+const peFileSize = document.getElementById('pe-file-size');
+const peEntropyTotal = document.getElementById('pe-entropy-total');
+const peSectionsCount = document.getElementById('pe-sections-count');
+const peDllsCount = document.getElementById('pe-dlls-count');
+const peResourcesCount = document.getElementById('pe-resources-count');
+const peIsPacked = document.getElementById('pe-is-packed');
+
 // History Panel elements
 const historyBtn = document.getElementById('history-btn');
 const historyPanel = document.getElementById('history-panel');
@@ -338,9 +354,13 @@ function renderPeResult(scanResult) {
   const apiList = scanResult.key_findings.api_imports || [];
   const graphData = generateGraphData(apiList, scanResult.classification);
   drawCallGraph(graphData);
+  
+  // Populate AI-specific sections if data is available
+  populateAIVoting(scanResult.ai_voting);
+  populatePeMetadata(scanResult.pe_metadata);
 
-    // Generate QR for PE report
-    generatePeQr(scanResult);
+  // Generate QR for PE report
+  generatePeQr(scanResult);
 }
 
 function renderNonPeResult(scanResult) {
@@ -421,6 +441,10 @@ function clearResultData() {
     callGraphEl.innerHTML = '';
     currentGraphLines.forEach(line => line.remove());
     currentGraphLines = [];
+    
+    // Hide AI-specific sections
+    if (aiVotingSection) aiVotingSection.style.display = 'none';
+    if (peMetadataSection) peMetadataSection.style.display = 'none';
 }
 
 // --- QR helpers ---
@@ -560,6 +584,62 @@ function removeAnimationClasses() {
     bodyEl.classList.remove('result-safe-active');
     bodyEl.classList.remove('result-suspicious-active');
     bodyEl.classList.remove('result-malware-active');
+}
+
+// --- AI VOTING UI FUNCTION ---
+function populateAIVoting(votingData) {
+    if (!votingData || !aiVotingSection) {
+        if (aiVotingSection) aiVotingSection.style.display = 'none';
+        return;
+    }
+    
+    const benignVotes = votingData.benign || 0;
+    const malwareVotes = votingData.malware || 0;
+    const totalVotes = votingData.total_models || (benignVotes + malwareVotes);
+    
+    if (totalVotes === 0) {
+        aiVotingSection.style.display = 'none';
+        return;
+    }
+    
+    // Calculate percentages
+    const benignPercent = (benignVotes / totalVotes) * 100;
+    const malwarePercent = (malwareVotes / totalVotes) * 100;
+    
+    // Update vote bars
+    voteBarBenign.style.width = `${benignPercent}%`;
+    voteBarMalware.style.width = `${malwarePercent}%`;
+    voteCountBenign.textContent = benignVotes;
+    voteCountMalware.textContent = malwareVotes;
+    
+    aiVotingSection.style.display = 'block';
+}
+
+// --- PE METADATA UI FUNCTION ---
+function populatePeMetadata(metadata) {
+    if (!metadata || !peMetadataSection) {
+        if (peMetadataSection) peMetadataSection.style.display = 'none';
+        return;
+    }
+    
+    // Format file size
+    const fileSize = metadata.file_size || 0;
+    let sizeStr = fileSize + ' bytes';
+    if (fileSize > 1024 * 1024) {
+        sizeStr = (fileSize / (1024 * 1024)).toFixed(2) + ' MB';
+    } else if (fileSize > 1024) {
+        sizeStr = (fileSize / 1024).toFixed(2) + ' KB';
+    }
+    
+    peFileSize.textContent = sizeStr;
+    peEntropyTotal.textContent = metadata.entropy_total ? metadata.entropy_total.toFixed(2) : '-';
+    peSectionsCount.textContent = metadata.number_of_sections || '-';
+    peDllsCount.textContent = metadata.total_dlls || '-';
+    peResourcesCount.textContent = metadata.total_resources || '-';
+    peIsPacked.textContent = metadata.is_packed ? 'Yes' : 'No';
+    peIsPacked.style.color = metadata.is_packed ? 'var(--red)' : 'var(--green)';
+    
+    peMetadataSection.style.display = 'block';
 }
 
 // --- Reset to Initial State Function ---

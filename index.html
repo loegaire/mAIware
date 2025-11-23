@@ -142,6 +142,58 @@
                     <div id="qr-code" class="qr-code-wrapper"></div>
                 </div>
 
+                <!-- AI Model Voting Results -->
+                <div class="details-section" id="ai-voting-section" style="display:none;">
+                    <h4>AI Model Voting</h4>
+                    <div class="ai-voting-display">
+                        <div class="vote-bar">
+                            <span class="vote-label">Benign:</span>
+                            <div class="vote-bar-bg">
+                                <div class="vote-bar-fill vote-benign" id="vote-bar-benign"></div>
+                            </div>
+                            <span class="vote-count" id="vote-count-benign">0</span>
+                        </div>
+                        <div class="vote-bar">
+                            <span class="vote-label">Malware:</span>
+                            <div class="vote-bar-bg">
+                                <div class="vote-bar-fill vote-malware" id="vote-bar-malware"></div>
+                            </div>
+                            <span class="vote-count" id="vote-count-malware">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PE Metadata -->
+                <div class="details-section" id="pe-metadata-section" style="display:none;">
+                    <h4>PE File Metadata</h4>
+                    <div class="pe-metadata-grid">
+                        <div class="pe-meta-item">
+                            <span class="meta-label">File Size:</span>
+                            <span class="meta-value" id="pe-file-size">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Total Entropy:</span>
+                            <span class="meta-value" id="pe-entropy-total">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Sections:</span>
+                            <span class="meta-value" id="pe-sections-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Imported DLLs:</span>
+                            <span class="meta-value" id="pe-dlls-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Resources:</span>
+                            <span class="meta-value" id="pe-resources-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Packed:</span>
+                            <span class="meta-value" id="pe-is-packed">-</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="details-section">
                     <h4>What To Do Next</h4>
                     <p id="details-recommendation">...</p>

@@ -17,6 +17,7 @@ const dgram = require('node:dgram')
 const { getRandomDemoJson } = require('./jsonsamples') //
 const { determinePeStatus } = require('./file-type-detector') //
 const { getPrimaryIPv4 } = require('./system-info')
+const { classifyWithAI } = require('./ai-client') //
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
 const AGENT_ID = process.env.MAIWARE_AGENT_ID || os.hostname()
@@ -382,8 +383,25 @@ async function handleSmallFile(filePath, detectedFilename) {
         is_pe: false
       }
     } else {
-      scanResult = getRandomDemoJson(detectedFilename, fileHashes)
-      scanResult.is_pe = true
+      // Use real AI model prediction
+      postLog(`[AI] Calling AI model for ${detectedFilename}...`)
+      try {
+        scanResult = await classifyWithAI(filePath, fileHashes)
+        
+        // Check if AI failed and fallback to demo
+        if (scanResult.fallback) {
+          postLog(`[AI] AI failed (${scanResult.error}), using demo data`)
+          scanResult = getRandomDemoJson(detectedFilename, fileHashes)
+        } else {
+          postLog(`[AI] Classification: ${scanResult.classification} (${scanResult.confidence_score})`)
+        }
+        
+        scanResult.is_pe = true
+      } catch (err) {
+        postError(`[AI] Exception: ${err.message}, using demo data`)
+        scanResult = getRandomDemoJson(detectedFilename, fileHashes)
+        scanResult.is_pe = true
+      }
     }
 
     postLog(`[Scan] Scan completed. (Triggered by ${detectedFilename})`)
