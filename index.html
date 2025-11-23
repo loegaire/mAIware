@@ -10,7 +10,7 @@
     <!-- Chart.js for stats (which you already had) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <!-- QRCode.js for QR generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="assets/vendor/qrcode.min.js"></script>
     <!-- Link to the CSS file -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -262,8 +262,11 @@
                 <h3>Dynamic Function Call Graph (Simulation)</h3>
             </div>
             <div class="call-graph-container">
-                <div class="call-graph" id="call-graph">
-                    <!-- JS will populate this -->
+                <div class="call-graph">
+                    <div class="call-graph-image" id="call-graph-image" role="img" aria-label="Generated function call graph"></div>
+                    <div class="call-graph-placeholder" id="call-graph-placeholder">
+                        <!-- JS will populate nodes here -->
+                    </div>
                 </div>
             </div>
         </div>

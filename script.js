@@ -110,7 +110,8 @@ const scrollZoneBottom = document.getElementById('scroll-zone-bottom');
 
 // Graph Panel elements
 const graphWrapper = document.getElementById('graph-wrapper');
-const callGraphEl = document.getElementById('call-graph');
+const callGraphPlaceholderEl = document.getElementById('call-graph-placeholder');
+const callGraphImageEl = document.getElementById('call-graph-image');
 
 // Stats elements
 const statsWrapper = document.getElementById('stats-wrapper');
@@ -287,6 +288,7 @@ function renderPeResult(scanResult) {
   removeAnimationClasses();
   bodyEl.classList.remove('is-non-pe');
   nonPeResultWrapper.classList.remove('active');
+  resetCallGraphView();
 
   let resultIconClass = 'fas fa-check-circle'; //
   let resultMockDisassembly = mockDisassemblyBenign; //
@@ -353,7 +355,10 @@ function renderPeResult(scanResult) {
 
   const apiList = scanResult.key_findings.api_imports || [];
   const graphData = generateGraphData(apiList, scanResult.classification);
-  drawCallGraph(graphData);
+  const hasGraphImage = displayCallGraphImage(scanResult.cfg_image, graphData);
+  if (!hasGraphImage) {
+    drawCallGraph(graphData);
+  }
   
   // Populate AI-specific sections if data is available
   populateAIVoting(scanResult.ai_voting);
@@ -382,9 +387,7 @@ function renderNonPeResult(scanResult) {
 
   nonPeResultWrapper.classList.add('active');
 
-  callGraphEl.innerHTML = '';
-  currentGraphLines.forEach(line => line.remove());
-  currentGraphLines = [];
+  resetCallGraphView();
   entropyBarsContainer.innerHTML = '';
   keyStringsContainer.innerHTML = '';
 
@@ -437,14 +440,61 @@ function clearResultData() {
     entropyBarsContainer.innerHTML = '';
     keyStringsContainer.innerHTML = '';
     
-    // Clear graph
-    callGraphEl.innerHTML = '';
-    currentGraphLines.forEach(line => line.remove());
-    currentGraphLines = [];
-    
+    resetCallGraphView();
+
     // Hide AI-specific sections
     if (aiVotingSection) aiVotingSection.style.display = 'none';
     if (peMetadataSection) peMetadataSection.style.display = 'none';
+}
+
+// --- Call Graph Helpers ---
+function resetCallGraphView() {
+    currentGraphLines.forEach(line => line.remove());
+    currentGraphLines = [];
+
+    if (callGraphPlaceholderEl) {
+        callGraphPlaceholderEl.innerHTML = '';
+        callGraphPlaceholderEl.classList.remove('hidden');
+    }
+
+    if (callGraphImageEl) {
+        callGraphImageEl.innerHTML = '';
+        callGraphImageEl.classList.remove('visible');
+    }
+}
+
+function displayCallGraphImage(imageUrl, fallbackGraphData) {
+    if (!callGraphImageEl || !imageUrl) {
+        return false;
+    }
+
+    callGraphImageEl.innerHTML = '';
+    callGraphImageEl.classList.add('visible');
+
+    if (callGraphPlaceholderEl) {
+        callGraphPlaceholderEl.classList.add('hidden');
+        callGraphPlaceholderEl.innerHTML = '';
+    }
+
+    const img = document.createElement('img');
+    img.alt = 'Function call graph rendered from static analysis';
+    img.loading = 'lazy';
+    img.src = imageUrl;
+
+    img.addEventListener('error', () => {
+        console.warn('Graph image failed to load, falling back to placeholder graph');
+        callGraphImageEl.innerHTML = '<p class="graph-error">Call graph unavailable.</p>';
+        callGraphImageEl.classList.remove('visible');
+        if (callGraphPlaceholderEl) {
+            callGraphPlaceholderEl.classList.remove('hidden');
+        }
+        if (fallbackGraphData) {
+            drawCallGraph(fallbackGraphData);
+        }
+    });
+
+    callGraphImageEl.appendChild(img);
+    return true;
 }
 
 // --- QR helpers ---
@@ -458,7 +508,11 @@ function clearQr() {
 function generatePeQr(scanResult) {
     const qrSection = document.getElementById('qr-section');
     const qrEl = document.getElementById('qr-code');
-    if (!qrEl || !qrSection || typeof QRCode === 'undefined') return;
+    if (!qrEl || !qrSection) return;
+    if (typeof QRCode === 'undefined') {
+        console.warn('QRCode library unavailable; skipping QR generation');
+        return;
+    }
 
     // Build a compact JSON report that fits in a QR
     const report = {
@@ -783,17 +837,25 @@ function generateGraphData(apiImports, classification) {
 
 // --- Graph Drawing ---
 function drawCallGraph(graphData) {
-    // 1. Clear previous graph (both nodes and lines)
-    callGraphEl.innerHTML = '';
+    if (!callGraphPlaceholderEl) {
+        return;
+    }
+
+    callGraphPlaceholderEl.classList.remove('hidden');
+    callGraphPlaceholderEl.innerHTML = '';
     currentGraphLines.forEach(line => line.remove());
     currentGraphLines = [];
+
+    if (callGraphImageEl) {
+        callGraphImageEl.classList.remove('visible');
+        callGraphImageEl.innerHTML = '';
+    }
 
     if (!graphData || !graphData.nodes || !graphData.edges) {
         console.error("Invalid graph data received", graphData);
         return;
     }
 
-    // 2. Create and place all nodes
     graphData.nodes.forEach(node => {
         const nodeEl = document.createElement('div');
         nodeEl.id = node.id;
@@ -801,11 +863,9 @@ function drawCallGraph(graphData) {
         nodeEl.style.top = node.pos.top;
         nodeEl.style.left = node.pos.left;
         nodeEl.textContent = node.label;
-        callGraphEl.appendChild(nodeEl);
+        callGraphPlaceholderEl.appendChild(nodeEl);
     });
 
-    // 3. Draw all edges (must be done *after* nodes are in DOM)
-    // Use a slight timeout to ensure DOM is ready
     setTimeout(() => {
         graphData.edges.forEach(edge => {
             try {
@@ -827,7 +887,7 @@ function drawCallGraph(graphData) {
                 console.error("Could not draw line:", e);
             }
         });
-    }, 500); // 500ms timeout to let CSS fade-in finish
+    }, 500);
 }
 
 

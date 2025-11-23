@@ -1,6 +1,7 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
-const crypto = require('node:crypto');
+const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
 
 const AI_MODEL_DIR = path.join(__dirname, '..', 'mAIware---AI');
 const PYTHON_SCRIPT = path.join(AI_MODEL_DIR, 'predict_single.py');
@@ -168,7 +169,32 @@ function buildScanResult(filePath, fileHashes, aiResult) {
     };
   }
 
+  const cfgImage = normalizeCfgImage(aiResult.cfg_image);
+  if (cfgImage) {
+    result.cfg_image = cfgImage;
+  }
+
   return result;
+}
+
+function normalizeCfgImage(imagePath) {
+  if (typeof imagePath !== 'string' || imagePath.length === 0) {
+    return null;
+  }
+
+  if (imagePath.startsWith('file://')) {
+    return imagePath;
+  }
+
+  try {
+    if (fs.existsSync(imagePath)) {
+      return pathToFileURL(imagePath).href;
+    }
+  } catch (err) {
+    console.warn('[AI] Unable to normalize CFG image path:', err.message);
+  }
+
+  return imagePath;
 }
 
 module.exports = { classifyWithAI };
