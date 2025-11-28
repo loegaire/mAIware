@@ -10,7 +10,7 @@
     <!-- Chart.js for stats (which you already had) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <!-- QRCode.js for QR generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="assets/vendor/qrcode.min.js"></script>
     <!-- Link to the CSS file -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -142,6 +142,58 @@
                     <div id="qr-code" class="qr-code-wrapper"></div>
                 </div>
 
+                <!-- AI Model Voting Results -->
+                <div class="details-section" id="ai-voting-section" style="display:none;">
+                    <h4>AI Model Voting</h4>
+                    <div class="ai-voting-display">
+                        <div class="vote-bar">
+                            <span class="vote-label">Benign:</span>
+                            <div class="vote-bar-bg">
+                                <div class="vote-bar-fill vote-benign" id="vote-bar-benign"></div>
+                            </div>
+                            <span class="vote-count" id="vote-count-benign">0</span>
+                        </div>
+                        <div class="vote-bar">
+                            <span class="vote-label">Malware:</span>
+                            <div class="vote-bar-bg">
+                                <div class="vote-bar-fill vote-malware" id="vote-bar-malware"></div>
+                            </div>
+                            <span class="vote-count" id="vote-count-malware">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PE Metadata -->
+                <div class="details-section" id="pe-metadata-section" style="display:none;">
+                    <h4>PE File Metadata</h4>
+                    <div class="pe-metadata-grid">
+                        <div class="pe-meta-item">
+                            <span class="meta-label">File Size:</span>
+                            <span class="meta-value" id="pe-file-size">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Total Entropy:</span>
+                            <span class="meta-value" id="pe-entropy-total">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Sections:</span>
+                            <span class="meta-value" id="pe-sections-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Imported DLLs:</span>
+                            <span class="meta-value" id="pe-dlls-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Resources:</span>
+                            <span class="meta-value" id="pe-resources-count">-</span>
+                        </div>
+                        <div class="pe-meta-item">
+                            <span class="meta-label">Packed:</span>
+                            <span class="meta-value" id="pe-is-packed">-</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="details-section">
                     <h4>What To Do Next</h4>
                     <p id="details-recommendation">...</p>
@@ -157,13 +209,13 @@
             <div class="stats-wrapper" id="stats-wrapper">
                 <div class="stats-grid">
                     <div class="stat-card"> <i class="fas fa-virus-slash"></i>
-                        <div class="stat-content"> <span class="stat-number" data-target="14720938">0</span> <span class="stat-label">Malware Analyzed</span> </div>
+                        <div class="stat-content"> <span class="stat-number" data-target="104">0</span> <span class="stat-label">Malware Analyzed</span> </div>
                     </div>
                     <div class="stat-card"> <i class="fas fa-users"></i>
-                        <div class="stat-content"> <span class="stat-number" data-target="82041">0</span> <span class="stat-label">Active Users</span> </div>
+                        <div class="stat-content"> <span class="stat-number" data-target="10">0</span> <span class="stat-label">Active Users</span> </div>
                     </div>
                     <div class="stat-card"> <i class="fas fa-chart-line"></i>
-                        <div class="stat-content"> <span class="stat-number" data-target="1259024">0</span> <span class="stat-label">Site Visits (24h)</span> </div>
+                        <div class="stat-content"> <span class="stat-number" data-target="142">0</span> <span class="stat-label">Site Visits (24h)</span> </div>
                     </div>
                 </div>
                 <div class="chart-container-wrapper">
@@ -210,8 +262,11 @@
                 <h3>Dynamic Function Call Graph (Simulation)</h3>
             </div>
             <div class="call-graph-container">
-                <div class="call-graph" id="call-graph">
-                    <!-- JS will populate this -->
+                <div class="call-graph">
+                    <div class="call-graph-image" id="call-graph-image" role="img" aria-label="Generated function call graph"></div>
+                    <div class="call-graph-placeholder" id="call-graph-placeholder">
+                        <!-- JS will populate nodes here -->
+                    </div>
                 </div>
             </div>
         </div>
