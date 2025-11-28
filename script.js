@@ -1197,6 +1197,27 @@ async function initializeScanHistory() {
     }
 }
 
+// Fetch LAN users count from server
+async function updateLanUsersCount() {
+    if (!window.electronAPI || typeof window.electronAPI.getLanUsers !== 'function') {
+        return;
+    }
+    
+    try {
+        const result = await window.electronAPI.getLanUsers();
+        if (result.success && result.data) {
+            const lanUsersElement = document.getElementById('lan-users-count');
+            if (lanUsersElement) {
+                const count = result.data.lanUsers || 0;
+                lanUsersElement.textContent = count.toLocaleString();
+                lanUsersElement.setAttribute('data-target', count);
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to fetch LAN users count:', error);
+    }
+}
+
 // --- Run on Page Load ---
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Animate Stat Cards
@@ -1233,4 +1254,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (prevBtn) prevBtn.addEventListener('click', showPreviousScan);
     if (nextBtn) nextBtn.addEventListener('click', showNextScan);
+    
+    // 5. Fetch and update LAN users count
+    updateLanUsersCount();
+    // Update every 30 seconds
+    setInterval(updateLanUsersCount, 30000);
 });

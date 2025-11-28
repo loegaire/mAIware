@@ -6,6 +6,7 @@ const { attachWindow, onMonitorEvent, requestManualScan, startMonitorWorker } = 
 const { determinePeStatus } = require('./file-type-detector')
 const { getPrimaryIPv4 } = require('./system-info')
 const Store = require('electron-store')
+const axios = require('axios')
 
 let backgroundControllerModule = null
 const store = new Store()
@@ -251,6 +252,17 @@ ipcMain.handle('history:get', async () => { // <-- ADD THIS BLOCK
 })
 ipcMain.handle('system-info:get-ip', async () => {
   return getPrimaryIPv4()
+})
+ipcMain.handle('server:get-lan-users', async () => {
+  try {
+    // Try to get server URL from environment or use default
+    const serverUrl = process.env.MAIWARE_SERVER_URL || 'http://localhost:3000'
+    const response = await axios.get(`${serverUrl}/api/lan-users`, { timeout: 5000 })
+    return { success: true, data: response.data }
+  } catch (error) {
+    console.warn('[LAN Users] Failed to fetch:', error.message)
+    return { success: false, error: error.message }
+  }
 })
 ipcMain.handle('scan:manual:pick-file', async () => {
   try {

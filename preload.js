@@ -15,5 +15,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemIp: () => ipcRenderer.invoke('system-info:get-ip'),
   getHistory: () => ipcRenderer.invoke('history:get'),
   pickManualScanFile: () => ipcRenderer.invoke('scan:manual:pick-file'),
-  scanManualFile: (filePath) => ipcRenderer.invoke('scan:manual', filePath)
+  scanManualFile: (filePath) => ipcRenderer.invoke('scan:manual', filePath),
+  getLanUsers: () => ipcRenderer.invoke('server:get-lan-users')
 })
