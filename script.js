@@ -224,6 +224,9 @@ window.electronAPI.onScanResult((scanResult) => {
   // Add to history
   scanHistory.push(scanResult);
   currentHistoryIndex = scanHistory.length - 1;
+  
+  // Update stats from history
+  updateStatsFromHistory();
 
     // If a result is already being viewed, do not auto-advance UI.
     if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
@@ -1191,9 +1194,52 @@ async function initializeScanHistory() {
         if (storedHistory && Array.isArray(storedHistory)) {
             scanHistory = storedHistory;
             currentHistoryIndex = scanHistory.length - 1;
+            // Update stats based on history
+            updateStatsFromHistory();
         }
     } catch (error) {
         console.error('Failed to load scan history:', error);
+    }
+}
+
+// Update stats from scan history
+function updateStatsFromHistory() {
+    if (!scanHistory || scanHistory.length === 0) {
+        return;
+    }
+    
+    // Count malware analyzed (Malware + Suspicious)
+    const malwareCount = scanHistory.filter(scan => 
+        scan.classification === 'Malware' || scan.classification === 'Suspicious'
+    ).length;
+    
+    // Update the Malware Analyzed stat
+    const malwareStatElement = document.getElementById('malware-analyzed-count');
+    if (malwareStatElement) {
+        const currentTarget = parseInt(malwareStatElement.getAttribute('data-target')) || 0;
+        
+        // Only animate if the value changed
+        if (currentTarget !== malwareCount) {
+            malwareStatElement.setAttribute('data-target', malwareCount);
+            
+            // Animate the counter
+            const duration = 1000;
+            const stepTime = 20;
+            const steps = duration / stepTime;
+            const increment = (malwareCount - currentTarget) / steps;
+            let current = currentTarget;
+            
+            const updateCount = () => {
+                current += increment;
+                if ((increment > 0 && current < malwareCount) || (increment < 0 && current > malwareCount)) {
+                    malwareStatElement.textContent = Math.ceil(current).toLocaleString();
+                    setTimeout(updateCount, stepTime);
+                } else {
+                    malwareStatElement.textContent = malwareCount.toLocaleString();
+                }
+            };
+            updateCount();
+        }
     }
 }
 
