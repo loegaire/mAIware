@@ -11,10 +11,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Listen for PE metadata updates
   onScanFileMetadata: (callback) => ipcRenderer.on('scan-file-metadata', (_event, metadata) => callback(metadata)),
+  onScanDisassembly: (callback) => ipcRenderer.on('scan-disassembly', (_event, payload) => callback(payload)),
 
   getSystemIp: () => ipcRenderer.invoke('system-info:get-ip'),
   getHistory: () => ipcRenderer.invoke('history:get'),
   pickManualScanFile: () => ipcRenderer.invoke('scan:manual:pick-file'),
+  pickManualScanFolder: () => ipcRenderer.invoke('scan:manual:pick-folder'),
   scanManualFile: (filePath) => ipcRenderer.invoke('scan:manual', filePath),
+  scanManualFolder: (folderPath) => ipcRenderer.invoke('scan:manual-folder', folderPath),
   getLanUsers: () => ipcRenderer.invoke('server:get-lan-users')
 })

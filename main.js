@@ -109,6 +109,35 @@ const getDownloadsPath = () => {
   return cachedDownloadsPath
 }
 
+async function collectFilesRecursively(targetPath) {
+  const results = []
+  let entries = []
+
+  try {
+    entries = await fsPromises.readdir(targetPath, { withFileTypes: true })
+  } catch (err) {
+    console.warn(`[Manual Scan] Skipping unreadable path ${targetPath}:`, err.message)
+    return results
+  }
+
+  for (const entry of entries) {
+    const fullPath = path.join(targetPath, entry.name)
+
+    if (entry.isSymbolicLink()) {
+      continue
+    }
+
+    if (entry.isDirectory()) {
+      const nested = await collectFilesRecursively(fullPath)
+      results.push(...nested)
+    } else if (entry.isFile()) {
+      results.push(fullPath)
+    }
+  }
+
+  return results
+}
+
 const dispatchMetadataUpdate = (filename, metadata) => {
   if (!filename) {
     return
@@ -279,6 +308,21 @@ ipcMain.handle('scan:manual:pick-file', async () => {
     return { canceled: true, error: err instanceof Error ? err.message : String(err) }
   }
 })
+ipcMain.handle('scan:manual:pick-folder', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    })
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { canceled: true }
+    }
+
+    return { canceled: false, folderPath: result.filePaths[0] }
+  } catch (err) {
+    return { canceled: true, error: err instanceof Error ? err.message : String(err) }
+  }
+})
 ipcMain.handle('scan:manual', async (_event, targetPath) => {
   if (typeof targetPath !== 'string' || targetPath.trim().length === 0) {
     return { ok: false, error: 'Select a file to scan.' }
@@ -299,6 +343,36 @@ ipcMain.handle('scan:manual', async (_event, targetPath) => {
   try {
     requestManualScan(resolvedPath)
     return { ok: true, path: resolvedPath }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+ipcMain.handle('scan:manual-folder', async (_event, folderPath) => {
+  if (typeof folderPath !== 'string' || folderPath.trim().length === 0) {
+    return { ok: false, error: 'Select a folder to scan.' }
+  }
+
+  const resolvedPath = path.resolve(folderPath.trim())
+
+  try {
+    await fsPromises.access(resolvedPath, fs.constants.R_OK)
+    const stats = await fsPromises.stat(resolvedPath)
+    if (!stats.isDirectory()) {
+      return { ok: false, error: 'Please choose a folder, not a file.' }
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+
+  try {
+    const files = await collectFilesRecursively(resolvedPath)
+    if (files.length === 0) {
+      return { ok: false, error: 'No files found to scan in that folder.' }
+    }
+
+    files.forEach((file) => requestManualScan(file))
+
+    return { ok: true, folder: resolvedPath, queued: files.length }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

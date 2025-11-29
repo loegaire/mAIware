@@ -18,6 +18,7 @@ const { getRandomDemoJson } = require('./jsonsamples') //
 const { determinePeStatus } = require('./file-type-detector') //
 const { getPrimaryIPv4 } = require('./system-info')
 const { classifyWithAI } = require('./ai-client') //
+const { Capstone, Const, loadCapstone } = require('capstone-wasm')
 
 const AI_APP_API_ENDPOINT = 'http://localhost:1234/scan' //
 const AGENT_ID = process.env.MAIWARE_AGENT_ID || os.hostname()
@@ -29,11 +30,17 @@ const LAST_KNOWN_PATH = path.join(os.homedir(), '.maiware-server.json')
 let resolvedServerBaseUrl = null
 const FILE_SIZE_THRESHOLD = 50 * 1024 * 1024 * 1024 //
 const DEFAULT_SCAN_DELAY_MS = 10000
+const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000
+const DISASM_MAX_BYTES = 1024
+const DISASM_MAX_INSNS = 200
+const DISASM_CHANNEL = 'scan-disassembly'
 
 const fileQueue = [] //
 let isProcessing = false //
 let activeWatcher = null //
 let shutdownRequested = false //
+let heartbeatInterval = null //
+let capstoneReady = false //
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms)) //
 
@@ -48,6 +55,118 @@ const normalizeBoolean = (value) => {
 const skipUpload = normalizeBoolean(process.env.MAIWARE_SKIP_UPLOAD)
 const customDelay = Number.parseInt(process.env.MAIWARE_SCAN_DELAY_MS || '', 10)
 const SCAN_DELAY_MS = Number.isFinite(customDelay) ? Math.max(0, customDelay) : DEFAULT_SCAN_DELAY_MS
+const ensureCapstoneReady = async () => {
+  if (capstoneReady) {
+    return
+  }
+
+  await loadCapstone()
+  capstoneReady = true
+}
+
+function parsePeHeaders(buffer) {
+  if (!buffer || buffer.length < 0x100) {
+    throw new Error('File too small to be a valid PE')
+  }
+
+  const peOffset = buffer.readUInt32LE(0x3c)
+  if (peOffset + 0x18 > buffer.length) {
+    throw new Error('Invalid PE header offset')
+  }
+
+  const signature = buffer.slice(peOffset, peOffset + 4).toString('ascii')
+  if (signature !== 'PE\u0000\u0000') {
+    throw new Error('Not a PE file')
+  }
+
+  const numberOfSections = buffer.readUInt16LE(peOffset + 6)
+  const sizeOfOptionalHeader = buffer.readUInt16LE(peOffset + 20)
+  const optionalHeaderOffset = peOffset + 24
+  const magic = buffer.readUInt16LE(optionalHeaderOffset)
+  const is64 = magic === 0x20b
+  const entryRva = buffer.readUInt32LE(optionalHeaderOffset + 16)
+  const sectionTableOffset = optionalHeaderOffset + sizeOfOptionalHeader
+  const sections = []
+
+  for (let i = 0; i < numberOfSections; i++) {
+    const offset = sectionTableOffset + i * 40
+    if (offset + 40 > buffer.length) {
+      break
+    }
+
+    const name = buffer.slice(offset, offset + 8).toString('ascii').replace(/\u0000+$/, '')
+    const virtualSize = buffer.readUInt32LE(offset + 8)
+    const virtualAddress = buffer.readUInt32LE(offset + 12)
+    const sizeOfRawData = buffer.readUInt32LE(offset + 16)
+    const pointerToRawData = buffer.readUInt32LE(offset + 20)
+
+    sections.push({
+      name,
+      virtualSize,
+      virtualAddress,
+      sizeOfRawData,
+      pointerToRawData,
+    })
+  }
+
+  return { entryRva, is64, sections }
+}
+
+function rvaToOffset(rva, sections) {
+  for (const section of sections) {
+    const start = section.virtualAddress
+    const end = start + Math.max(section.virtualSize, section.sizeOfRawData)
+    if (rva >= start && rva < end) {
+      return section.pointerToRawData + (rva - start)
+    }
+  }
+
+  return null
+}
+
+async function generateDisassemblySnippet(filePath) {
+  try {
+    const buffer = await fsPromises.readFile(filePath)
+    const headers = parsePeHeaders(buffer)
+
+    const entryOffset = rvaToOffset(headers.entryRva, headers.sections)
+    if (entryOffset === null || entryOffset >= buffer.length) {
+      throw new Error('Entry point not mapped to a file offset')
+    }
+
+    await ensureCapstoneReady()
+    const mode = headers.is64 ? Const.CS_MODE_64 : Const.CS_MODE_32
+    const cs = new Capstone(Const.CS_ARCH_X86, mode)
+
+    const sliceEnd = Math.min(buffer.length, entryOffset + DISASM_MAX_BYTES)
+    const codeBytes = buffer.subarray(entryOffset, sliceEnd)
+    const insns = cs.disasm(codeBytes, headers.entryRva, DISASM_MAX_INSNS)
+
+    const instructions = []
+    for (const insn of insns) {
+      const opStr = insn.op_str || insn.opStr || ''
+      instructions.push({
+        address: `0x${insn.address.toString(16)}`,
+        mnemonic: insn.mnemonic,
+        op_str: opStr,
+      })
+
+      if (/^ret/i.test(insn.mnemonic)) {
+        break
+      }
+    }
+
+    return {
+      instructions,
+      arch: headers.is64 ? 'x86_64' : 'x86',
+      entryRva: headers.entryRva,
+      is64: headers.is64,
+    }
+  } catch (err) {
+    postError(`[Disasm] Failed to generate disassembly: ${err.message}`)
+    return null
+  }
+}
 
 function postLog(message) {
   parentPort.postMessage({ channel: 'log', payload: message })
@@ -329,6 +448,42 @@ async function sendResultToServer(scanResult, retries = 3) {
   postLog('[Server] All upload attempts failed. Scan result will be lost.')
 }
 
+async function sendHeartbeat(reason = 'heartbeat') {
+  try {
+    const baseUrl = await resolveServerBaseUrl()
+    const endpoint = `${baseUrl}/api/clients/heartbeat`
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+
+    const payload = {
+      agent_id: AGENT_ID,
+      systemInfo: {
+        hostname: os.hostname(),
+        ip: AGENT_IP
+      },
+      reason
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeout)
+
+    if (!response.ok) {
+      postLog(`[Heartbeat] Failed (${response.status} ${response.statusText})`)
+    } else {
+      postLog('[Heartbeat] Client presence updated')
+    }
+  } catch (err) {
+    postLog(`[Heartbeat] Error: ${err.message}`)
+  }
+}
+
 async function handleSmallFile(filePath, detectedFilename) {
   const uploadTask = async () => {
     if (skipUpload) {
@@ -375,6 +530,7 @@ async function handleSmallFile(filePath, detectedFilename) {
 
     // Build the proper result based on PE status
     let scanResult
+    let disasmSnippet = null
     if (!isPe) {
       scanResult = {
         detected_filename: detectedFilename,
@@ -383,6 +539,18 @@ async function handleSmallFile(filePath, detectedFilename) {
         is_pe: false
       }
     } else {
+      disasmSnippet = await generateDisassemblySnippet(filePath)
+      if (disasmSnippet && Array.isArray(disasmSnippet.instructions) && disasmSnippet.instructions.length > 0) {
+        parentPort.postMessage({
+          channel: DISASM_CHANNEL,
+          payload: {
+            filename: detectedFilename,
+            instructions: disasmSnippet.instructions,
+            meta: { arch: disasmSnippet.arch, entryRva: disasmSnippet.entryRva, is64: disasmSnippet.is64 }
+          }
+        })
+      }
+
       // Use real AI model prediction
       postLog(`[AI] Calling AI model for ${detectedFilename}...`)
       try {
@@ -401,6 +569,21 @@ async function handleSmallFile(filePath, detectedFilename) {
         postError(`[AI] Exception: ${err.message}, using demo data`)
         scanResult = getRandomDemoJson(detectedFilename, fileHashes)
         scanResult.is_pe = true
+      }
+    }
+
+    // Attach real disassembly for entry point (first function) if possible
+    if (scanResult.is_pe) {
+      const disasm = disasmSnippet || await generateDisassemblySnippet(filePath)
+      if (disasm && Array.isArray(disasm.instructions) && disasm.instructions.length > 0) {
+        scanResult.disassembly = disasm.instructions
+        scanResult.disassembly_meta = {
+          arch: disasm.arch,
+          entryRva: disasm.entryRva,
+        }
+        postLog(`[Disasm] Captured ${disasm.instructions.length} instructions from entry point`)
+      } else {
+        postLog('[Disasm] No disassembly available (empty result)')
       }
     }
 
@@ -496,6 +679,17 @@ async function closeWatcher() {
   }
 }
 
+function startHeartbeatLoop() {
+  // Send an immediate heartbeat, then repeat on a cadence to keep presence fresh
+  sendHeartbeat('startup').catch(() => {})
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval)
+  }
+  heartbeatInterval = setInterval(() => {
+    sendHeartbeat('interval').catch(() => {})
+  }, HEARTBEAT_INTERVAL_MS)
+}
+
 function queueManualScan(filePath) {
   const normalized = path.resolve(filePath)
   postLog(`[Monitor] Manually queued file: ${normalized}`)
@@ -540,6 +734,10 @@ async function handleShutdownRequest() {
 
   await waitForIdle()
   await closeWatcher()
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval)
+    heartbeatInterval = null
+  }
 
   parentPort.postMessage({ channel: 'shutdown-complete' })
 
@@ -587,5 +785,6 @@ if (parentPort) {
 postLog(`[Monitor] Worker bootstrapped (pid ${process.pid}). Upload ${skipUpload ? 'disabled' : 'enabled'}, scan delay ${SCAN_DELAY_MS}ms.`)
 
 setupWatcher(workerData.downloadPath)
+startHeartbeatLoop()
 
 parentPort.postMessage({ channel: 'ready', payload: { downloadPath: workerData.downloadPath } })

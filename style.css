@@ -313,6 +313,10 @@ h1 {
     justify-content: center;
 }
 
+.manual-upload .btn + .btn {
+    margin-top: 0.5rem;
+}
+
 .manual-scan-hint {
     color: var(--text-dark);
     font-size: 0.95rem;
@@ -324,6 +328,18 @@ h1 {
     font-size: 0.9rem;
     margin-top: 0.5rem;
     min-height: 1.2rem;
+}
+
+.manual-error.is-success {
+    color: var(--green);
+}
+
+.manual-error.is-info {
+    color: var(--text-dark);
+}
+
+.manual-error.is-error {
+    color: var(--red);
 }
 
 /* --- State 2: Analyzing --- */

@@ -54,6 +54,7 @@ const nonPeFilename = document.getElementById('non-pe-filename');
 const nonPeHashSha256 = document.getElementById('non-pe-hash-sha256');
 const nonPeHashMd5 = document.getElementById('non-pe-hash-md5');
 const manualScanBtn = document.getElementById('manual-scan-btn');
+const manualFolderScanBtn = document.getElementById('manual-folder-scan-btn');
 const manualScanError = document.getElementById('manual-scan-error');
 
 const bodyEl = document.body;
@@ -116,6 +117,13 @@ const callGraphImageEl = document.getElementById('call-graph-image');
 // Stats elements
 const statsWrapper = document.getElementById('stats-wrapper');
 
+// Submission type buckets used by the pie chart
+const submissionTypeLabels = ['PE (exe/dll)', 'JavaScript', 'VBS', 'Macro', 'Other'];
+const peExtensions = ['exe', 'dll', 'sys', 'scr', 'com', 'msi', 'cpl', 'drv', 'ocx'];
+const jsExtensions = ['js', 'mjs', 'cjs'];
+const vbsExtensions = ['vbs', 'vbe'];
+const macroExtensions = ['docm', 'dotm', 'xlsm', 'xlsb', 'pptm', 'ppsm', 'ppam', 'potm', 'xltm'];
+
 
 // --- STATE ---
 let disassemblyInterval = null;
@@ -123,6 +131,7 @@ let scrollInterval = null; // For auto-scrolling
 let currentGraphLines = []; // Renamed from currentLines to avoid conflict
 let currentFileMetadata = null;
 let lastScanResult = null;
+let disassemblyAnimating = false;
 
 function resolveScanStartedFilename(payload) {
   if (typeof payload === 'string') {
@@ -143,19 +152,42 @@ function resolveScanStartedFilename(payload) {
   return 'Unknown file';
 }
 
-function showManualScanError(message = '') {
+function setManualScanMessage(message = '', tone = 'info') {
   if (!manualScanError) {
     return;
   }
 
   manualScanError.textContent = message;
+  manualScanError.classList.remove('is-error', 'is-success', 'is-info');
+
+  if (!message) {
+    return;
+  }
+
+  if (tone === 'success') {
+    manualScanError.classList.add('is-success');
+  } else if (tone === 'info') {
+    manualScanError.classList.add('is-info');
+  } else {
+    manualScanError.classList.add('is-error');
+  }
+}
+
+function setManualButtonsDisabled(disabled) {
+  if (manualScanBtn) {
+    manualScanBtn.disabled = disabled;
+  }
+
+  if (manualFolderScanBtn) {
+    manualFolderScanBtn.disabled = disabled;
+  }
 }
 
 if (manualScanBtn) {
   manualScanBtn.addEventListener('click', async (event) => {
     event.preventDefault();
-    showManualScanError('');
-    manualScanBtn.disabled = true;
+    setManualScanMessage('');
+    setManualButtonsDisabled(true);
 
     try {
       const selection = await window.electronAPI.pickManualScanFile();
@@ -169,9 +201,39 @@ if (manualScanBtn) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start manual scan.';
-      showManualScanError(message);
+      setManualScanMessage(message, 'error');
     } finally {
-      manualScanBtn.disabled = false;
+      setManualButtonsDisabled(false);
+    }
+  });
+}
+
+if (manualFolderScanBtn) {
+  manualFolderScanBtn.addEventListener('click', async (event) => {
+    event.preventDefault();
+    setManualScanMessage('');
+    setManualButtonsDisabled(true);
+
+    try {
+      const selection = await window.electronAPI.pickManualScanFolder();
+      if (!selection || selection.canceled || !selection.folderPath) {
+        return;
+      }
+
+      const response = await window.electronAPI.scanManualFolder(selection.folderPath);
+      if (!response || !response.ok) {
+        throw new Error(response && response.error ? response.error : 'Unable to start folder scan.');
+      }
+
+      const queued = response.queued || 0;
+      const folderName = response.folder || 'folder';
+      const suffix = queued === 1 ? 'file' : 'files';
+      setManualScanMessage(`Queued ${queued} ${suffix} from ${folderName} for scanning.`, 'success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start folder scan.';
+      setManualScanMessage(message, 'error');
+    } finally {
+      setManualButtonsDisabled(false);
     }
   });
 }
@@ -181,13 +243,13 @@ window.electronAPI.onScanStarted((payload) => {
   const filename = resolveScanStartedFilename(payload);
   console.log(`UI: Received scan-started for ${filename}`);
 
-    showManualScanError('');
+  setManualScanMessage('');
 
-    // If user is viewing a result, don't auto-switch to analyzing.
-    if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
-        console.log('UI: Result is being viewed; deferring analyzing UI switch');
-        return;
-    }
+  // If user is viewing a result, don't auto-switch to analyzing.
+  if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
+    console.log('UI: Result is being viewed; deferring analyzing UI switch');
+    return;
+  }
 
   // 1. Set UI to "Analyzing" state
   initialState.classList.remove('active'); //
@@ -205,21 +267,39 @@ window.electronAPI.onScanStarted((payload) => {
   bodyEl.classList.add('is-analyzing'); //
   removeAnimationClasses(); //
   
-  // 3. Populate disassembly with a "suspicious" default and start animation
-  // (We don't know the result yet, so we pick one)
-  populateDisassembly(mockDisassemblySuspicious); //
-  startDisassemblyAnimation(); //
+  // 3. Reset disassembly while waiting for real data
+  stopDisassemblyAnimation(true);
+  populateDisassembly([]);
 
   // 4. Clear old results
   clearResultData();
+});
+
+// Disassembly streaming during analysis
+window.electronAPI.onScanDisassembly((payload) => {
+  if (!payload || !bodyEl.classList.contains('is-analyzing')) {
+    return;
+  }
+
+  const instructions = Array.isArray(payload.instructions) ? payload.instructions : [];
+  if (instructions.length === 0) {
+    return;
+  }
+
+  renderDisassemblyFromResult(
+    {
+      detected_filename: payload.filename || 'unknown',
+      disassembly: instructions,
+    },
+    { animate: true }
+  );
 });
 
 // 2. Listen for the 'scan-result' message
 window.electronAPI.onScanResult((scanResult) => {
   console.log("UI: Received scan-result:", scanResult);
 
-  clearInterval(disassemblyInterval); //
-  disassemblyInterval = null; //
+  stopDisassemblyAnimation(true); //
 
   // Add to history
   scanHistory.push(scanResult);
@@ -354,7 +434,7 @@ function renderPeResult(scanResult) {
   populateEntropyBars(scanResult.key_findings.section_entropy || []); //
   populateKeyStrings(scanResult.key_findings.key_strings || [], scanResult.classification); //
 
-  populateDisassembly(resultMockDisassembly); //
+  renderDisassemblyFromResult(scanResult, { animate: false });
 
   const apiList = scanResult.key_findings.api_imports || [];
   const graphData = generateGraphData(apiList, scanResult.classification);
@@ -374,6 +454,7 @@ function renderPeResult(scanResult) {
 function renderNonPeResult(scanResult) {
   removeAnimationClasses();
   bodyEl.classList.add('is-non-pe');
+  stopDisassemblyAnimation(true);
   resultState.className = 'scanner-state active';
   resultIcon.className = 'result-icon fas fa-file';
   resultText.textContent = '';
@@ -643,6 +724,67 @@ function removeAnimationClasses() {
     bodyEl.classList.remove('result-malware-active');
 }
 
+function extractFileExtension(filename) {
+    if (!filename || typeof filename !== 'string') {
+        return '';
+    }
+
+    const normalized = filename.toLowerCase().trim();
+    const base = normalized.split(/[\\/]/).pop() || normalized;
+    const lastDot = base.lastIndexOf('.');
+
+    if (lastDot === -1) {
+        return '';
+    }
+
+    return base.slice(lastDot + 1);
+}
+
+function determineSubmissionType(scan) {
+    const filename = scan && typeof scan === 'object' ? scan.detected_filename : '';
+    const ext = extractFileExtension(filename);
+
+    if (scan && scan.is_pe) {
+        return submissionTypeLabels[0]; // PE
+    }
+
+    if (peExtensions.includes(ext)) {
+        return submissionTypeLabels[0]; // PE
+    }
+
+    if (jsExtensions.includes(ext)) {
+        return submissionTypeLabels[1]; // JavaScript
+    }
+
+    if (vbsExtensions.includes(ext)) {
+        return submissionTypeLabels[2]; // VBS
+    }
+
+    if (macroExtensions.includes(ext)) {
+        return submissionTypeLabels[3]; // Macro
+    }
+
+    return submissionTypeLabels[4]; // Other
+}
+
+function buildSubmissionTypeData() {
+    const counts = submissionTypeLabels.map(() => 0);
+
+    if (!Array.isArray(scanHistory)) {
+        return { labels: submissionTypeLabels, counts };
+    }
+
+    scanHistory.forEach((scan) => {
+        const type = determineSubmissionType(scan);
+        const idx = submissionTypeLabels.indexOf(type);
+        if (idx !== -1) {
+            counts[idx] += 1;
+        }
+    });
+
+    return { labels: submissionTypeLabels, counts };
+}
+
 // --- AI VOTING UI FUNCTION ---
 function populateAIVoting(votingData) {
     if (!votingData || !aiVotingSection) {
@@ -741,12 +883,27 @@ function populateDisassembly(codeLines) {
     });
 }
 
-function startDisassemblyAnimation() {
+function stopDisassemblyAnimation(clearActive = false) {
     if (disassemblyInterval) {
         clearInterval(disassemblyInterval);
+        disassemblyInterval = null;
     }
+    disassemblyAnimating = false;
+    if (clearActive) {
+        const active = disassemblyCodeEl.querySelector('.disassembly-line.active');
+        if (active) {
+            active.classList.remove('active');
+        }
+    }
+}
+
+function startDisassemblyAnimation() {
+    stopDisassemblyAnimation(true);
     let currentLine = 0;
     const totalLines = disassemblyCodeEl.children.length;
+    if (totalLines === 0) {
+        return;
+    }
 
     disassemblyInterval = setInterval(() => {
         const prevLine = document.querySelector('.disassembly-line.active');
@@ -765,6 +922,34 @@ function startDisassemblyAnimation() {
         }
         currentLine = (currentLine + 1) % totalLines;
     }, 150);
+    disassemblyAnimating = true;
+}
+
+function renderDisassemblyFromResult(scanResult, options = {}) {
+    const { animate = false } = options;
+    const instructions = Array.isArray(scanResult?.disassembly) ? scanResult.disassembly : [];
+
+    if (instructions.length > 0) {
+        const lines = instructions.map((insn, index) => {
+            const addr = insn.address || `0x${(index * 4).toString(16)}`;
+            const mnemonic = insn.mnemonic || '';
+            const opStr = insn.op_str || insn.opStr || '';
+            const args = opStr ? ` ${opStr}` : '';
+            return `<span class="addr">${addr}</span> <span class="op">${mnemonic}</span><span class="args">${args}</span>`;
+        });
+
+        populateDisassembly(lines);
+        if (animate) {
+            startDisassemblyAnimation();
+        } else {
+            stopDisassemblyAnimation(true);
+        }
+        return;
+    }
+
+    // Fallback to placeholder disassembly
+    populateDisassembly([]);
+    stopDisassemblyAnimation(true);
 }
 
 /**
@@ -1041,6 +1226,8 @@ let topMalwareChart = null;
 
 // --- Function to create/recreate charts ---
 window.recreateCharts = function() {
+    const submissionData = buildSubmissionTypeData();
+
     // Check if light theme is active
     const isLightTheme = document.body.classList.contains('light-theme');
     
@@ -1063,10 +1250,10 @@ window.recreateCharts = function() {
         malwareTypesChart = new Chart(typesCtx, {
             type: 'doughnut',
             data: {
-                labels: ['PE (exe/dll)', 'JavaScript', 'VBS', 'Macro', 'Other'],
+                labels: submissionData.labels,
                 datasets: [{
                     label: 'Submission Types',
-                    data: [65, 15, 8, 7, 5],
+                    data: submissionData.counts,
                     backgroundColor: [
                         '#007bff', // Blue
                         '#f1c40f', // Yellow
@@ -1240,6 +1427,10 @@ function updateStatsFromHistory() {
             };
             updateCount();
         }
+    }
+
+    if (typeof window.recreateCharts === 'function') {
+        window.recreateCharts();
     }
 }
 
