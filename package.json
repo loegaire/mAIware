@@ -40,6 +40,7 @@
     "gopd": "^1.2.0",
     "got": "^11.8.6",
     "graceful-fs": "^4.2.11",
+    "graphviz": "^0.0.9",
     "has-flag": "^4.0.0",
     "has-property-descriptors": "^1.0.2",
     "http-cache-semantics": "^4.2.0",
