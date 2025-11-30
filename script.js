@@ -132,6 +132,20 @@ let currentGraphLines = []; // Renamed from currentLines to avoid conflict
 let currentFileMetadata = null;
 let lastScanResult = null;
 let disassemblyAnimating = false;
+let currentAnalyzingFilename = null; // Track which file is currently being analyzed
+
+// --- VERBOSE LOGGING ---
+const VERBOSE = true;
+function logVerbose(category, message, data = null) {
+  if (!VERBOSE) return;
+  const timestamp = new Date().toISOString().substr(11, 12);
+  const prefix = `[${timestamp}][${category}]`;
+  if (data !== null) {
+    console.log(`${prefix} ${message}`, data);
+  } else {
+    console.log(`${prefix} ${message}`);
+  }
+}
 
 function resolveScanStartedFilename(payload) {
   if (typeof payload === 'string') {
@@ -241,13 +255,16 @@ if (manualFolderScanBtn) {
 // 1. Listen for the 'scan-started' message from the backend
 window.electronAPI.onScanStarted((payload) => {
   const filename = resolveScanStartedFilename(payload);
-  console.log(`UI: Received scan-started for ${filename}`);
+  logVerbose('SCAN', `scan-started received for: ${filename}`);
+  
+  // Track the current file being analyzed
+  currentAnalyzingFilename = filename;
 
   setManualScanMessage('');
 
   // If user is viewing a result, don't auto-switch to analyzing.
   if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
-    console.log('UI: Result is being viewed; deferring analyzing UI switch');
+    logVerbose('SCAN', 'Result is being viewed; deferring analyzing UI switch');
     return;
   }
 
@@ -277,18 +294,41 @@ window.electronAPI.onScanStarted((payload) => {
 
 // Disassembly streaming during analysis
 window.electronAPI.onScanDisassembly((payload) => {
+  logVerbose('DISASM', `Received disassembly stream`, { 
+    payloadFilename: payload?.filename, 
+    currentAnalyzing: currentAnalyzingFilename,
+    isAnalyzing: bodyEl.classList.contains('is-analyzing'),
+    instructionCount: payload?.instructions?.length || 0
+  });
+
   if (!payload || !bodyEl.classList.contains('is-analyzing')) {
+    logVerbose('DISASM', 'Ignoring: not in analyzing state or no payload');
+    return;
+  }
+
+  // CRITICAL FIX: Only accept disassembly for the file currently being analyzed
+  const payloadFilename = payload.filename || 'unknown';
+  if (currentAnalyzingFilename && payloadFilename !== currentAnalyzingFilename) {
+    logVerbose('DISASM', `Ignoring stale disassembly: expected ${currentAnalyzingFilename}, got ${payloadFilename}`);
     return;
   }
 
   const instructions = Array.isArray(payload.instructions) ? payload.instructions : [];
   if (instructions.length === 0) {
+    logVerbose('DISASM', 'No instructions in payload');
     return;
+  }
+
+  logVerbose('DISASM', `Rendering ${instructions.length} instructions for ${payloadFilename}`);
+  
+  // Update the disassembly filename display
+  if (disassemblyFilenameEl) {
+    disassemblyFilenameEl.textContent = payloadFilename;
   }
 
   renderDisassemblyFromResult(
     {
-      detected_filename: payload.filename || 'unknown',
+      detected_filename: payloadFilename,
       disassembly: instructions,
     },
     { animate: true }
@@ -297,32 +337,43 @@ window.electronAPI.onScanDisassembly((payload) => {
 
 // 2. Listen for the 'scan-result' message
 window.electronAPI.onScanResult((scanResult) => {
-  console.log("UI: Received scan-result:", scanResult);
+  logVerbose('RESULT', `scan-result received`, {
+    filename: scanResult?.detected_filename,
+    classification: scanResult?.classification,
+    is_pe: scanResult?.is_pe,
+    hasDisassembly: !!(scanResult?.disassembly?.length),
+    hasCfgImage: !!scanResult?.cfg_image
+  });
 
-  stopDisassemblyAnimation(true); //
+  stopDisassemblyAnimation(true);
 
   // Add to history
   scanHistory.push(scanResult);
   currentHistoryIndex = scanHistory.length - 1;
+  logVerbose('HISTORY', `Added to history, now at index ${currentHistoryIndex} of ${scanHistory.length}`);
   
   // Update stats from history
   updateStatsFromHistory();
 
-    // If a result is already being viewed, do not auto-advance UI.
-    if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
-        updateNavigationButtons();
-        return;
-    }
-
-    bodyEl.classList.remove('is-analyzing'); //
-    bodyEl.classList.add('is-showing-result'); //
-
-    analyzingState.classList.remove('active'); //
-    resultState.classList.add('active'); //
-
-    lastScanResult = scanResult;
-    renderScanResult();
+  // If a result is already being viewed, do not auto-advance UI.
+  if (bodyEl.classList.contains('is-showing-result') || bodyEl.classList.contains('is-non-pe')) {
+    logVerbose('RESULT', 'Result already viewed, just updating nav buttons');
     updateNavigationButtons();
+    return;
+  }
+
+  bodyEl.classList.remove('is-analyzing');
+  bodyEl.classList.add('is-showing-result');
+
+  analyzingState.classList.remove('active');
+  resultState.classList.add('active');
+
+  lastScanResult = scanResult;
+  // Clear analyzing filename since we're done
+  currentAnalyzingFilename = null;
+  
+  renderScanResult();
+  updateNavigationButtons();
 });
 
 window.electronAPI.onScanFileMetadata((metadata) => {
@@ -330,22 +381,53 @@ window.electronAPI.onScanFileMetadata((metadata) => {
     return;
   }
 
+  logVerbose('METADATA', `Received metadata for: ${metadata.filename}`, {
+    isPe: metadata.isPe,
+    error: metadata.error
+  });
+
   currentFileMetadata = metadata;
 
+  // CRITICAL: Only re-render if the scan result does NOT have its own is_pe flag set
+  // The scan result's is_pe (from scanner-worker) is authoritative
   if (lastScanResult && metadata.filename === lastScanResult.detected_filename) {
+    // If the scan result already has is_pe defined, don't let metadata override it
+    if (lastScanResult.is_pe !== undefined) {
+      logVerbose('METADATA', `Ignoring metadata isPe=${metadata.isPe} because scan result has authoritative is_pe=${lastScanResult.is_pe}`);
+      return;
+    }
+    logVerbose('METADATA', 'Re-rendering with metadata (no is_pe in scan result)');
     renderScanResult();
   }
 });
 
 function renderScanResult() {
   if (!lastScanResult) {
+    logVerbose('RENDER', 'renderScanResult called but no lastScanResult');
     return;
   }
 
-  const metadataMatches = currentFileMetadata && currentFileMetadata.filename === lastScanResult.detected_filename;
-  const isNonPe = metadataMatches && currentFileMetadata.isPe === false;
+  logVerbose('RENDER', `renderScanResult for: ${lastScanResult.detected_filename}`, {
+    is_pe_flag: lastScanResult.is_pe,
+    metadataFilename: currentFileMetadata?.filename,
+    metadataIsPe: currentFileMetadata?.isPe,
+    classification: lastScanResult.classification
+  });
 
-  if (isNonPe) {
+  // CRITICAL FIX: Use the is_pe flag from the scan result itself, not stale metadata
+  // The scan result's is_pe flag is authoritative and set by the scanner-worker
+  const isNonPe = lastScanResult.is_pe === false;
+  
+  // Fallback to metadata only if is_pe is not set in result (legacy compatibility)
+  const metadataMatches = currentFileMetadata && currentFileMetadata.filename === lastScanResult.detected_filename;
+  const metadataSaysNonPe = metadataMatches && currentFileMetadata.isPe === false;
+  
+  // Result's is_pe takes precedence; otherwise check metadata
+  const shouldRenderAsNonPe = (lastScanResult.is_pe !== undefined) ? isNonPe : metadataSaysNonPe;
+
+  logVerbose('RENDER', `PE determination: is_pe=${lastScanResult.is_pe}, metadataSaysNonPe=${metadataSaysNonPe}, final=${shouldRenderAsNonPe ? 'non-PE' : 'PE'}`);
+
+  if (shouldRenderAsNonPe) {
     renderNonPeResult(lastScanResult);
     return;
   }
@@ -368,13 +450,24 @@ function ensureAnimationWrapper() {
 }
 
 function renderPeResult(scanResult) {
+  logVerbose('RENDER', `renderPeResult: ${scanResult.detected_filename}`, {
+    hasDisassembly: !!(scanResult.disassembly?.length),
+    disasmCount: scanResult.disassembly?.length || 0,
+    hasCfgImage: !!scanResult.cfg_image
+  });
+
   removeAnimationClasses();
   bodyEl.classList.remove('is-non-pe');
   nonPeResultWrapper.classList.remove('active');
   resetCallGraphView();
+  
+  // Update disassembly filename display to match current result
+  if (disassemblyFilenameEl) {
+    disassemblyFilenameEl.textContent = scanResult.detected_filename || '';
+  }
 
-  let resultIconClass = 'fas fa-check-circle'; //
-  let resultMockDisassembly = mockDisassemblyBenign; //
+  let resultIconClass = 'fas fa-check-circle';
+  let resultMockDisassembly = mockDisassemblyBenign;
   let resultBodyClass = 'result-safe-active'; //
   let resultScannerClass = 'result-safe'; //
   let resultProgressClass = 'progress-bar-green'; //
@@ -452,9 +545,17 @@ function renderPeResult(scanResult) {
 }
 
 function renderNonPeResult(scanResult) {
+  logVerbose('RENDER', `renderNonPeResult: ${scanResult.detected_filename}`);
+  
   removeAnimationClasses();
   bodyEl.classList.add('is-non-pe');
   stopDisassemblyAnimation(true);
+  
+  // Update disassembly filename even for non-PE (to show context)
+  if (disassemblyFilenameEl) {
+    disassemblyFilenameEl.textContent = scanResult.detected_filename || '';
+  }
+  
   resultState.className = 'scanner-state active';
   resultIcon.className = 'result-icon fas fa-file';
   resultText.textContent = '';
@@ -474,9 +575,12 @@ function renderNonPeResult(scanResult) {
   resetCallGraphView();
   entropyBarsContainer.innerHTML = '';
   keyStringsContainer.innerHTML = '';
+  
+  // Clear disassembly for non-PE files
+  populateDisassembly([]);
 
-    // Hide QR for non-PE
-    clearQr();
+  // Hide QR for non-PE
+  clearQr();
 }
 
 /**
@@ -548,7 +652,10 @@ function resetCallGraphView() {
 }
 
 function displayCallGraphImage(imageUrl, fallbackGraphData) {
+    logVerbose('GRAPH', `displayCallGraphImage called`, { imageUrl: imageUrl?.substring(0, 100), hasFallback: !!fallbackGraphData });
+    
     if (!callGraphImageEl || !imageUrl) {
+        logVerbose('GRAPH', 'No image element or URL, returning false');
         return false;
     }
 
@@ -565,8 +672,12 @@ function displayCallGraphImage(imageUrl, fallbackGraphData) {
     img.loading = 'lazy';
     img.src = imageUrl;
 
+    img.addEventListener('load', () => {
+        logVerbose('GRAPH', 'Call graph image loaded successfully');
+    });
+
     img.addEventListener('error', () => {
-        console.warn('Graph image failed to load, falling back to placeholder graph');
+        logVerbose('GRAPH', 'Graph image failed to load, falling back to placeholder');
         callGraphImageEl.innerHTML = '<p class="graph-error">Call graph unavailable.</p>';
         callGraphImageEl.classList.remove('visible');
         if (callGraphPlaceholderEl) {
@@ -578,6 +689,7 @@ function displayCallGraphImage(imageUrl, fallbackGraphData) {
     });
 
     callGraphImageEl.appendChild(img);
+    logVerbose('GRAPH', 'Image element appended to DOM');
     return true;
 }
 
@@ -928,6 +1040,12 @@ function startDisassemblyAnimation() {
 function renderDisassemblyFromResult(scanResult, options = {}) {
     const { animate = false } = options;
     const instructions = Array.isArray(scanResult?.disassembly) ? scanResult.disassembly : [];
+    const filename = scanResult?.detected_filename || 'unknown';
+
+    logVerbose('DISASM', `renderDisassemblyFromResult: ${filename}`, {
+      instructionCount: instructions.length,
+      animate: animate
+    });
 
     if (instructions.length > 0) {
         const lines = instructions.map((insn, index) => {
@@ -938,6 +1056,7 @@ function renderDisassemblyFromResult(scanResult, options = {}) {
             return `<span class="addr">${addr}</span> <span class="op">${mnemonic}</span><span class="args">${args}</span>`;
         });
 
+        logVerbose('DISASM', `Populating ${lines.length} disassembly lines for ${filename}`);
         populateDisassembly(lines);
         if (animate) {
             startDisassemblyAnimation();
@@ -947,6 +1066,7 @@ function renderDisassemblyFromResult(scanResult, options = {}) {
         return;
     }
 
+    logVerbose('DISASM', `No disassembly available for ${filename}, clearing display`);
     // Fallback to placeholder disassembly
     populateDisassembly([]);
     stopDisassemblyAnimation(true);
@@ -1360,6 +1480,13 @@ function showPreviousScan() {
     if (currentHistoryIndex > 0) {
         currentHistoryIndex--;
         lastScanResult = scanHistory[currentHistoryIndex];
+        logVerbose('NAV', `Previous scan: index ${currentHistoryIndex}, file: ${lastScanResult?.detected_filename}`);
+        
+        // Update disassembly filename to match navigated result
+        if (disassemblyFilenameEl && lastScanResult) {
+            disassemblyFilenameEl.textContent = lastScanResult.detected_filename || '';
+        }
+        
         renderScanResult();
         updateNavigationButtons();
     }
@@ -1369,6 +1496,13 @@ function showNextScan() {
     if (currentHistoryIndex < scanHistory.length - 1) {
         currentHistoryIndex++;
         lastScanResult = scanHistory[currentHistoryIndex];
+        logVerbose('NAV', `Next scan: index ${currentHistoryIndex}, file: ${lastScanResult?.detected_filename}`);
+        
+        // Update disassembly filename to match navigated result
+        if (disassemblyFilenameEl && lastScanResult) {
+            disassemblyFilenameEl.textContent = lastScanResult.detected_filename || '';
+        }
+        
         renderScanResult();
         updateNavigationButtons();
     }

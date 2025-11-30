@@ -34,11 +34,12 @@ async function determinePeStatus(filePath) {
   try {
     const headerBuffer = await readInitialBytes(absolutePath, 4096)
     try {
-      peLib.NtExecutable.from(headerBuffer)
+      // Use ignoreCert: true to allow parsing signed executables
+      peLib.NtExecutable.from(headerBuffer, { ignoreCert: true })
       return { isPe: true }
     } catch (headerErr) {
       const fullBuffer = await fs.readFile(absolutePath)
-      peLib.NtExecutable.from(fullBuffer)
+      peLib.NtExecutable.from(fullBuffer, { ignoreCert: true })
       return { isPe: true }
     }
   } catch (err) {
